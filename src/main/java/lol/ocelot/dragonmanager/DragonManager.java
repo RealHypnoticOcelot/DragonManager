@@ -2,28 +2,27 @@ package lol.ocelot.dragonmanager;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
+import javax.swing.filechooser.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.*;
-import java.util.Objects;
-import java.util.prefs.*;
-import java.util.Properties;
-import javax.imageio.ImageIO;
+import java.util.*;
 
 public class DragonManager extends JFrame implements ActionListener {
 
-    public static FileInputStream config;
-
+    // Get config file, or create if there isn't one
+    public static Properties prop;
     static {
         try {
             Path configpath = Paths.get(DragonManager.class.getResource("/").getPath());
             File configfile = new File(configpath + "/" + "config.properties");
-            configfile.createNewFile();
-            config = new FileInputStream(String.valueOf(DragonManager.class.getResourceAsStream("config.properties")));
+            configfile.createNewFile(); // Just doesn't work if it already exists
+            FileInputStream config = new FileInputStream(configfile); // Get the file
+            prop = new Properties();
+            prop.load(config); // Load config file as properties
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -63,11 +62,33 @@ public class DragonManager extends JFrame implements ActionListener {
         changeBG.addActionListener(this);
         viewMenu.add(changeBG);
 
+        JMenuItem resetBG = new JMenuItem("Reset Background");
+        resetBG.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0));
+        resetBG.setActionCommand("resetBG");
+        resetBG.addActionListener(this);
+        viewMenu.add(resetBG);
+
+        JMenuItem themeToggle = new JMenuItem("Change Theme");
+        themeToggle.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F6, 0));
+        themeToggle.setActionCommand("themeToggle");
+        themeToggle.addActionListener(this);
+        viewMenu.add(themeToggle);
+
+        // Add Menu Items to Menubar
         menuBar.add(fileSelect);
         menuBar.add(viewMenu);
         return menuBar;
     }
 
+    public void setBackground() {
+        if (!(prop.get("wallpaper") == null)) {
+            try {
+                this.setContentPane(new JLabel(new ImageIcon(ImageIO.read(new File(prop.get("wallpaper").toString())))));
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
     // All Actions from buttons and menus
     public void actionPerformed(ActionEvent e) {
         if ("newChar".equals(e.getActionCommand())) {
@@ -79,13 +100,50 @@ public class DragonManager extends JFrame implements ActionListener {
         } else if ("changeBG".equals(e.getActionCommand())) {
             //Create File Chooser Object
             JFileChooser filePick = new JFileChooser();
+            filePick.addChoosableFileFilter(new ImagesPicker());
+            filePick.setAcceptAllFileFilterUsed(false);
             // Open the dialogue
             int returnVal = filePick.showOpenDialog(DragonManager.this);
             // if the user selected a file and didn't cancel
             if (returnVal == JFileChooser.APPROVE_OPTION) {
                 File file = filePick.getSelectedFile();
-                file.getAbsolutePath();
+                prop.setProperty("wallpaper", file.getAbsolutePath());
+                setBackground();
             }
+        }
+    }
+
+    // File picker set to only accept images
+    class ImagesPicker extends FileFilter {
+        @Override
+        public boolean accept(File f) {
+            if (f.isDirectory()) {
+                return true;
+            }
+
+            String extension = getExtension(f);
+            if (extension != null) {
+                return extension.equals("jpeg") ||
+                        extension.equals("jpg") ||
+                        extension.equals("png");
+            }
+            return false;
+        }
+
+        @Override
+        public String getDescription() {
+            return ".jpg, .jpeg, .png";
+        }
+
+        String getExtension(File f) {
+            String ext = null;
+            String s = f.getName();
+            int i = s.lastIndexOf('.');
+
+            if (i > 0 &&  i < s.length() - 1) {
+                ext = s.substring(i+1).toLowerCase();
+            }
+            return ext;
         }
     }
 
@@ -105,6 +163,7 @@ public class DragonManager extends JFrame implements ActionListener {
         super("DragonManager");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new GridBagLayout());
+        setBackground();
         GridBagConstraints c = new GridBagConstraints();
 
         // Set Icon
@@ -145,6 +204,9 @@ public class DragonManager extends JFrame implements ActionListener {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
+                try {
+                    UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+                } catch (Exception ignore) { }
                 System.setProperty("apple.laf.useScreenMenuBar", "true"); // If on macOS make menu bar show up top
                 new DragonManager();
             }
