@@ -66,7 +66,7 @@ public class DragonManager extends JFrame {
         setJMenuBar(menu);
 
         JLabel welcomeText = createText("Welcome to DragonManager!", c);
-        // Grid offset of the following object
+        // Grid offset of the following objec
         c.gridy = 1;
         JButton newCharBtn = createButton("New Character", c);
         c.gridy = 2;
