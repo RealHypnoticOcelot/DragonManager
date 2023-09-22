@@ -10,7 +10,9 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
+import com.formdev.flatlaf.*;
 
+FlatLightLaf.setup();
 public class DragonManager extends JFrame implements ActionListener {
 
     // Get config file, or create if there isn't one
