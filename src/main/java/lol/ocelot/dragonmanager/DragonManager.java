@@ -3,31 +3,22 @@ package lol.ocelot.dragonmanager;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import javax.swing.filechooser.*;
+import javax.swing.filechooser.FileFilter;
 import java.awt.*;
 import java.awt.event.*;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.*;
 import java.util.*;
+import java.util.prefs.*;
 import com.formdev.flatlaf.*;
 
-FlatLightLaf.setup();
+
 public class DragonManager extends JFrame implements ActionListener {
 
     // Get config file, or create if there isn't one
-    public static Properties prop;
+    public static Preferences prefs;
     static {
-        try {
-            Path configpath = Paths.get(DragonManager.class.getResource("/").getPath());
-            File configfile = new File(configpath + "/" + "config.properties");
-            configfile.createNewFile(); // Just doesn't work if it already exists
-            FileInputStream config = new FileInputStream(configfile); // Get the file
-            prop = new Properties();
-            prop.load(config); // Load config file as properties
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        prefs = Preferences.userRoot().node(DragonManager.class.getName());
     }
 
     private JMenuBar createMenu() {
@@ -83,9 +74,9 @@ public class DragonManager extends JFrame implements ActionListener {
     }
 
     public void setBackground() {
-        if (!(prop.get("wallpaper") == null)) {
+        if (!(prefs.get("wallpaper", null) == null)) {
             try {
-                this.setContentPane(new JLabel(new ImageIcon(ImageIO.read(new File(prop.get("wallpaper").toString())))));
+                this.setContentPane(new JLabel(new ImageIcon(ImageIO.read(new File(prefs.get("wallpaper", null))))));
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
@@ -109,8 +100,23 @@ public class DragonManager extends JFrame implements ActionListener {
             // if the user selected a file and didn't cancel
             if (returnVal == JFileChooser.APPROVE_OPTION) {
                 File file = filePick.getSelectedFile();
-                prop.setProperty("wallpaper", file.getAbsolutePath());
+                prefs.put("wallpaper", file.getAbsolutePath());
                 setBackground();
+            }
+        } else if ("resetBG".equals(e.getActionCommand())) {
+                prefs.remove("wallpaper");
+        } else if ("themeToggle".equals(e.getActionCommand())) {
+            try {
+                if (UIManager.getLookAndFeel().getName().equals("FlatLaf Light")) {
+                    UIManager.setLookAndFeel(new FlatDarkLaf());
+                    prefs.put("theme", "dark");
+                } else {
+                    UIManager.setLookAndFeel(new FlatLightLaf());
+                    prefs.put("theme", "light");
+                }
+                SwingUtilities.updateComponentTreeUI(DragonManager.getFrames()[0]);
+            } catch (UnsupportedLookAndFeelException ex) {
+                throw new RuntimeException(ex);
             }
         }
     }
@@ -183,6 +189,7 @@ public class DragonManager extends JFrame implements ActionListener {
         JMenuBar menu = createMenu();
         setJMenuBar(menu);
 
+        c.insets = new Insets(3, 0,3,0);
         createText("Welcome to DragonManager!", c);
         c.gridy = 1;
         JButton newCharBtn = createButton("New Character", c);
@@ -203,12 +210,19 @@ public class DragonManager extends JFrame implements ActionListener {
         setVisible(true);
     }
 
+
     public static void main(String[] args) {
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 try {
-                    UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-                } catch (Exception ignore) { }
+                    if (prefs.get("theme", null) == "dark") { // use == because it can be null
+                        UIManager.setLookAndFeel(new FlatDarkLaf());
+                    } else {
+                        UIManager.setLookAndFeel(new FlatLightLaf());
+                    }
+                } catch( Exception ex ) {
+                    System.err.println( "Failed to initialize LaF, " + ex);
+                }
                 System.setProperty("apple.laf.useScreenMenuBar", "true"); // If on macOS make menu bar show up top
                 new DragonManager();
             }
