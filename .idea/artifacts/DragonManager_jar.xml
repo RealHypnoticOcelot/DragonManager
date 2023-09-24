@@ -1,9 +1,0 @@
-<component name="ArtifactManager">
-  <artifact type="jar" name="DragonManager:jar">
-    <output-path>$PROJECT_DIR$/out/artifacts/DragonManager_jar</output-path>
-    <root id="archive" name="DragonManager.jar">
-      <element id="module-output" name="DragonManager" />
-      <element id="extracted-dir" path="$PROJECT_DIR$/lib/flatlaf-3.2.1.jar" path-in-jar="/" />
-    </root>
-  </artifact>
-</component>
