@@ -2,24 +2,39 @@ package lol.ocelot.dragonmanager;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
-import javax.swing.filechooser.*;
 import javax.swing.filechooser.FileFilter;
 import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.*;
 import java.io.*;
-import java.net.URL;
-import java.nio.file.*;
 import java.util.*;
 import java.util.prefs.*;
 import com.formdev.flatlaf.*;
+import java.net.*;
 
 public class DragonManager extends JFrame implements ActionListener {
 
     // Get config file, or create if there isn't one
     public static Preferences prefs;
-    static {
+    public static BackgroundPanel bgObject;
+    public static JRadioButtonMenuItem bgScaled;
+    public static JRadioButtonMenuItem bgTiled;
+    public static JRadioButtonMenuItem bgActual;
+    static { // Static
         prefs = Preferences.userRoot().node(DragonManager.class.getName());
+
+    }
+    { // Not static
+        bgObject = new BackgroundPanel(null, BackgroundPanel.SCALED, 0.0f, 0.0f);
+    }
+
+    private boolean APIisReachable() {
+        // Get whether open5e is available
+        try {
+            return(InetAddress.getByName("api.open5e.com").isReachable(1000));
+        } catch (IOException e) {
+            return(false);
+        }
     }
 
     private JMenuBar createMenu() {
@@ -31,39 +46,71 @@ public class DragonManager extends JFrame implements ActionListener {
         JMenu viewMenu = new JMenu("View");
 
         // Add Items to File Menu
+
+        // Character Submenu
+        JMenu charMenu = new JMenu("Character");
+        fileSelect.add(charMenu);
+
         JMenuItem newChar = new JMenuItem("New Character...");
         newChar.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F1, 0));
         newChar.setActionCommand("newChar");
         newChar.addActionListener(this);
-        fileSelect.add(newChar);
+        charMenu.add(newChar);
 
         JMenuItem loadChar = new JMenuItem("Load Character...");
         loadChar.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F2, 0));
         loadChar.setActionCommand("loadChar");
         loadChar.addActionListener(this);
-        fileSelect.add(loadChar);
+        charMenu.add(loadChar);
 
         JMenuItem saveChar = new JMenuItem("Save Character");
-        saveChar.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F3, 0));
+        saveChar.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
         saveChar.setActionCommand("saveChar");
         saveChar.addActionListener(this);
-        fileSelect.add(saveChar);
+        charMenu.add(saveChar);
 
         // Add Items to View Menu
+
+        // Background Submenu
+        JMenu bgMenu = new JMenu("Background");
+        viewMenu.add(bgMenu);
+
         JMenuItem changeBG = new JMenuItem("Change Background");
-        changeBG.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F4, 0));
+        changeBG.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F3, 0));
         changeBG.setActionCommand("changeBG");
         changeBG.addActionListener(this);
-        viewMenu.add(changeBG);
+        bgMenu.add(changeBG);
 
         JMenuItem resetBG = new JMenuItem("Reset Background");
-        resetBG.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0));
+        resetBG.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F4, 0));
         resetBG.setActionCommand("resetBG");
         resetBG.addActionListener(this);
-        viewMenu.add(resetBG);
+        bgMenu.add(resetBG);
+
+        // Background Scaling Menu
+        JMenu bgScaling = new JMenu("Scaling");
+        bgMenu.add(bgScaling);
+
+        bgScaled = new JRadioButtonMenuItem("Scaled");
+        bgScaled.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0));
+        bgScaled.addActionListener(new ScalingEvent(0));
+        bgScaled.setSelected(prefs.getInt("scalingType", 0) == 0);
+        bgScaling.add(bgScaled);
+
+        bgTiled = new JRadioButtonMenuItem("Tiled");
+        bgTiled.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F6, 0));
+        bgTiled.addActionListener(new ScalingEvent(1));
+        bgTiled.setSelected(prefs.getInt("scalingType", 0) == 1);
+        bgScaling.add(bgTiled);
+
+        bgActual = new JRadioButtonMenuItem("Actual Size");
+        bgActual.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F7, 0));
+        bgActual.addActionListener(new ScalingEvent(2));
+        bgActual.setSelected(prefs.getInt("scalingType", 0) == 2);
+        bgScaling.add(bgActual);
 
         JMenuItem themeToggle = new JMenuItem("Change Theme");
-        themeToggle.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F6, 0));
+        themeToggle.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_F8, 0));
         themeToggle.setActionCommand("themeToggle");
         themeToggle.addActionListener(this);
         viewMenu.add(themeToggle);
@@ -74,22 +121,60 @@ public class DragonManager extends JFrame implements ActionListener {
         return menuBar;
     }
 
-    public void setBackground() {
+    public void setBackground(BackgroundPanel bgPanel) {
         if (!(prefs.get("wallpaper", null) == null)) {
             try {
                 BufferedImage bgImage = ImageIO.read(new File(prefs.get("wallpaper", null)));
-//                BackgroundPanel bgPanel = new BackgroundPanel(bgImage, BackgroundPanel.SCALED, 0.0f, 0.0f);
-//                this.add(bgPanel);
-                System.out.println("blahhh");
+                bgPanel.setImage(bgImage);
+                int Scaling = prefs.getInt("scalingType", 0);
+                /*
+                    0 = Scaled
+                    1 = Tiled
+                    2 = Actual Size
+                */
+                bgPanel.setStyle(Scaling);
+
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
+        } else {
+            bgPanel.setImage(null);
         }
     }
-    // All Actions from buttons and menus
+
+    // Actions from scaling menus
+    private class ScalingEvent implements ActionListener {
+        private int ScaleValue;
+        public ScalingEvent(int ScaleValue) {
+            this.ScaleValue = ScaleValue;
+        }
+
+        public void actionPerformed(ActionEvent e) {
+            prefs.putInt("scalingType", ScaleValue);
+
+            // Spaghetti code to uncheck the other selections when another is selected
+            if (ScaleValue == 0) {
+                bgTiled.setSelected(false);
+                bgActual.setSelected(false);
+            } else if (ScaleValue == 1) {
+                bgScaled.setSelected(false);
+                bgActual.setSelected(false);
+            } else if (ScaleValue == 2) {
+                bgScaled.setSelected(false);
+                bgTiled.setSelected(false);
+            }
+            setBackground(bgObject);
+        }
+    }
+
+    // All Other Actions from buttons and menus
     public void actionPerformed(ActionEvent e) {
         if ("newChar".equals(e.getActionCommand())) {
-            System.out.println("newCharacter");
+            if (APIisReachable()) {
+                System.out.println("API");
+            } else {
+                JOptionPane.showMessageDialog(null, "Cannot access API, unable to create characters!", "Error!", JOptionPane.INFORMATION_MESSAGE);
+            }
         } else if ("loadChar".equals(e.getActionCommand())) {
             System.out.println("loadCharacter");
         } else if ("saveChar".equals(e.getActionCommand())) {
@@ -105,11 +190,11 @@ public class DragonManager extends JFrame implements ActionListener {
             if (returnVal == JFileChooser.APPROVE_OPTION) {
                 File file = filePick.getSelectedFile();
                 prefs.put("wallpaper", file.getAbsolutePath());
-                JOptionPane.showMessageDialog(this, "Background Changed!\nRelaunch the application to apply your changes.");
+                setBackground(bgObject);
             }
         } else if ("resetBG".equals(e.getActionCommand())) {
-                prefs.remove("wallpaper");
-                JOptionPane.showMessageDialog(this, "Background Changed!\nRelaunch the application to apply your changes.");
+            prefs.remove("wallpaper");
+            setBackground(bgObject);
         } else if ("themeToggle".equals(e.getActionCommand())) {
             try {
                 if (UIManager.getLookAndFeel().getName().equals("FlatLaf Light")) {
@@ -429,9 +514,15 @@ public class DragonManager extends JFrame implements ActionListener {
     public DragonManager() {
         super("DragonManager");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        // Create background object and add it as a component
+        add(bgObject);
+        setBackground(bgObject); // Set background if there is ones
+        setContentPane(bgObject);
+
         setLayout(new GridBagLayout());
-        setBackground();
         GridBagConstraints c = new GridBagConstraints();
+
         // Set Icon
         try {
             if (System.getProperty("os.name").toLowerCase().contains("mac")) {
@@ -472,6 +563,7 @@ public class DragonManager extends JFrame implements ActionListener {
     public static void main(String[] args) {
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
+                // Set theme for application if a preference is set
                 try {
                     if (Objects.equals(prefs.get("theme", null), "dark")) { // use == because it can be null
                         UIManager.setLookAndFeel(new FlatDarkLaf());

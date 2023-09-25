@@ -6,7 +6,7 @@
 
     <groupId>lol.ocelot.dragonmanager</groupId>
     <artifactId>DragonManager</artifactId>
-    <version>1.5-SNAPSHOT</version>
+    <version>1.6-SNAPSHOT</version>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -25,9 +25,28 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>3.5.0</version>
+                <groupId>io.github.fvarrui</groupId>
+                <artifactId>javapackager</artifactId>
+                <version>1.7.4</version>
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>package</goal>
+                        </goals>
+                        <configuration>
+                            <!-- mandatory -->
+                            <mainClass>lol.ocelot.dragonmanager.DragonManager</mainClass>
+                            <!-- optional -->
+                            <bundleJre>true</bundleJre>
+                            <generateInstaller>false</generateInstaller>
+                            <copyDependencies>true</copyDependencies>
+                            <administratorRequired>false</administratorRequired>
+                            <platform>windows</platform>
+                            <createZipball>true</createZipball>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
