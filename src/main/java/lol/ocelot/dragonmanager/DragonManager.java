@@ -179,6 +179,19 @@ public class DragonManager extends JFrame implements ActionListener {
         }
     }
 
+    private Object[] namesAndData(URL apiURL) {
+        JSONObject infoJSON = getJson(apiURL);
+        JSONObject[] infoArray = new JSONObject[infoJSON.getInt("count")]; // Create array that has space for however many values there are
+        Object[] infoNames = new Object[infoJSON.getInt("count")];
+
+        for (int i = 0; i <= infoJSON.getInt("count") - 1; i++) { // Subtract 1 because including zero
+            infoArray[i] = infoJSON.getJSONArray("results").getJSONObject(i);
+            infoNames[i] = infoArray[i].get("name");
+        }
+        System.out.println(infoArray);
+        return new Object[]{infoArray, infoNames};
+    }
+
     // All Other Actions from buttons and menus
     public void actionPerformed(ActionEvent e) {
         if ("newChar".equals(e.getActionCommand())) {
@@ -196,16 +209,9 @@ public class DragonManager extends JFrame implements ActionListener {
 
                 JSONObject raceObject = null;
                 try {
-                    // Get full JSON and create arrays for full race objects and just race names for the JOptionMEnu
-                    JSONObject racesJSON = getJson(new URL("https://api.open5e.com/races/?format=json"));
-                    JSONObject[] racesArray = new JSONObject[racesJSON.getInt("count")]; // Create array that has space for however many values there are
-                    Object[] racesNames = new Object[racesJSON.getInt("count")];
-
-                    // Fill arrays
-                    for (int i = 0; i <= racesJSON.getInt("count") - 1; i++) { // Subtract 1 because including zero
-                        racesArray[i] = racesJSON.getJSONArray("results").getJSONObject(i);
-                        racesNames[i] = racesArray[i].get("name");
-                    }
+                    Object[] info = namesAndData(new URL("https://api.open5e.com/races/?format=json"));
+                    JSONObject[] racesArray = (JSONObject[]) info[0];
+                    Object[] racesNames = (Object[]) info[1];
 
                     // Select race and make sure it's not empty
                     Object race = null;
@@ -224,16 +230,9 @@ public class DragonManager extends JFrame implements ActionListener {
 
                 JSONObject classObject = null;
                 try {
-                    JSONObject classesJSON = getJson(new URL("https://api.open5e.com/classes/?format=json"));
-                    JSONObject[] classesArray = new JSONObject[classesJSON.getInt("count")]; // Create array that has space for however many values there are
-                    Object[] classesNames = new Object[classesJSON.getInt("count")];
-
-                    // Fill arrays
-                    for (int i = 0; i <= classesJSON.getInt("count") - 1; i++) { // Subtract 1 because including zero
-                        classesArray[i] = classesJSON.getJSONArray("results").getJSONObject(i);
-                        classesNames[i] = classesArray[i].get("name");
-                    }
-
+                    Object[] info = namesAndData(new URL("https://api.open5e.com/classes/?format=json"));
+                    JSONObject[] classesArray = (JSONObject[]) info[0];
+                    Object[] classesNames = (Object[]) info[1];
                     // Select class and make sure it's not empty
                     Object classes = null;
                     do {
