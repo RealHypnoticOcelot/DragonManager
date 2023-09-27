@@ -81,14 +81,8 @@ public class DragonManager extends JFrame implements ActionListener {
         loadChar.addActionListener(this);
         charMenu.add(loadChar);
 
-        JMenuItem saveChar = new JMenuItem("Save Character");
-        saveChar.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_S, Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx()));
-        saveChar.setActionCommand("saveChar");
-        saveChar.addActionListener(this);
-        charMenu.add(saveChar);
 
         // Add Items to View Menu
-
         // Background Submenu
         JMenu bgMenu = new JMenu("Background");
         viewMenu.add(bgMenu);
@@ -200,7 +194,6 @@ public class DragonManager extends JFrame implements ActionListener {
                 while (characterName.isEmpty()); // Until the character's name isn't empty
                 charInfo.put("name", characterName);
 
-
                 JSONObject raceObject = null;
                 try {
                     // Get full JSON and create arrays for full race objects and just race names for the JOptionMEnu
@@ -225,6 +218,33 @@ public class DragonManager extends JFrame implements ActionListener {
                     }
                     while (race == null);
                     charInfo.put("genericRaceInfo", raceObject); // All info about race
+                } catch (MalformedURLException ex) {
+                    throw new RuntimeException(ex);
+                }
+
+                JSONObject classObject = null;
+                try {
+                    JSONObject classesJSON = getJson(new URL("https://api.open5e.com/classes/?format=json"));
+                    JSONObject[] classesArray = new JSONObject[classesJSON.getInt("count")]; // Create array that has space for however many values there are
+                    Object[] classesNames = new Object[classesJSON.getInt("count")];
+
+                    // Fill arrays
+                    for (int i = 0; i <= classesJSON.getInt("count") - 1; i++) { // Subtract 1 because including zero
+                        classesArray[i] = classesJSON.getJSONArray("results").getJSONObject(i);
+                        classesNames[i] = classesArray[i].get("name");
+                    }
+
+                    // Select class and make sure it's not empty
+                    Object classes = null;
+                    do {
+                        classes = JOptionPane.showInputDialog(null, "Choose Class:", "Input", JOptionPane.INFORMATION_MESSAGE, null, classesNames, classesNames[0]);
+                        if (classes != null) {
+                            int raceIndex = ArrayUtils.indexOf(classesNames, classes);
+                            classObject = classesArray[raceIndex]; // Convert from name to full character JSONObject
+                        }
+                    }
+                    while (classes == null);
+                    charInfo.put("genericClassInfo", classObject); // All info about race
                 } catch (MalformedURLException ex) {
                     throw new RuntimeException(ex);
                 }
@@ -266,7 +286,7 @@ public class DragonManager extends JFrame implements ActionListener {
                 // if the user selected a file and didn't cancel
                 if (returnVal == JFileChooser.APPROVE_OPTION) {
                     try {
-                        PrintWriter jsonFile = new PrintWriter(new File(saveLocation.getSelectedFile() + "/" + characterName.toLowerCase() + ".json"), "UTF-8");
+                        PrintWriter jsonFile = new PrintWriter(new File(saveLocation.getSelectedFile() + "/" + characterName.toLowerCase().replace(" ", "_") + ".json"), "UTF-8");
                         jsonFile.write(charInfo.toString(4));
                         jsonFile.close();
                     } catch (FileNotFoundException ex) {
@@ -279,9 +299,15 @@ public class DragonManager extends JFrame implements ActionListener {
                 JOptionPane.showMessageDialog(null, "Cannot access API, unable to create characters!\nAre you connected to a stable wifi connection?", "Error!", JOptionPane.ERROR_MESSAGE);
             }
         } else if ("loadChar".equals(e.getActionCommand())) {
-            System.out.println("loadCharacter");
-        } else if ("saveChar".equals(e.getActionCommand())) {
-            System.out.println("saveCharacter");
+            JFileChooser saveLocation = new JFileChooser();
+            saveLocation.setCurrentDirectory(new java.io.File("./characters"));
+            saveLocation.setAcceptAllFileFilterUsed(false);
+            saveLocation.addChoosableFileFilter(new jsonPicker());
+            int returnVal = saveLocation.showOpenDialog(DragonManager.this);
+            // if the user selected a file and didn't cancel
+            if (returnVal == JFileChooser.APPROVE_OPTION) {
+                System.out.println("loadchar");
+            }
         } else if ("changeBG".equals(e.getActionCommand())) {
             //Create File Chooser Object
             JFileChooser filePick = new JFileChooser();
@@ -312,6 +338,38 @@ public class DragonManager extends JFrame implements ActionListener {
             } catch (UnsupportedLookAndFeelException ex) {
                 throw new RuntimeException(ex);
             }
+        }
+    }
+
+    // Only accept json
+    class jsonPicker extends FileFilter {
+        @Override
+        public boolean accept(File f) {
+            if (f.isDirectory()) {
+                return true;
+            }
+
+            String extension = getExtension(f);
+            if (extension != null) {
+                return extension.equals("json");
+            }
+            return false;
+        }
+
+        @Override
+        public String getDescription() {
+            return ".json";
+        }
+
+        String getExtension(File f) {
+            String ext = null;
+            String s = f.getName();
+            int i = s.lastIndexOf('.');
+
+            if (i > 0 &&  i < s.length() - 1) {
+                ext = s.substring(i+1).toLowerCase();
+            }
+            return ext;
         }
     }
 
