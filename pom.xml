@@ -56,6 +56,10 @@
                             <bundleJre>true</bundleJre>
                             <jrePath>/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home</jrePath>
                             <generateInstaller>false</generateInstaller>
+                            <additionalResources>
+                                <additionalResource>characters/</additionalResource>
+                                <additionalResource>homebrew/</additionalResource>
+                            </additionalResources>
                             <copyDependencies>true</copyDependencies>
                             <administratorRequired>false</administratorRequired>
                             <platform>windows</platform>

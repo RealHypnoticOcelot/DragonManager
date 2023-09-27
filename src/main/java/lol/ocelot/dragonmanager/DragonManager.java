@@ -189,11 +189,17 @@ public class DragonManager extends JFrame implements ActionListener {
     public void actionPerformed(ActionEvent e) {
         if ("newChar".equals(e.getActionCommand())) {
             if (APIisReachable()) {
+                JSONObject charInfo = new JSONObject();
                 String characterName = "";
                 do {
                     characterName = JOptionPane.showInputDialog(null, "Enter Character Name:");
+                    if (characterName == null) {
+                        characterName = "";
+                    }
                 }
                 while (characterName.isEmpty()); // Until the character's name isn't empty
+                charInfo.put("name", characterName);
+
 
                 JSONObject raceObject = null;
                 try {
@@ -218,6 +224,7 @@ public class DragonManager extends JFrame implements ActionListener {
                         }
                     }
                     while (race == null);
+                    charInfo.put("genericRaceInfo", raceObject); // All info about race
                 } catch (MalformedURLException ex) {
                     throw new RuntimeException(ex);
                 }
@@ -234,20 +241,42 @@ public class DragonManager extends JFrame implements ActionListener {
                     }
                 }
                 while (characterLevel <= 0);
+                charInfo.put("level", characterLevel);
 
 
                 Object alignment = null;
                 Object[] alignmentList = {"Chaotic Evil", "Chaotic Good", "Chaotic Neutral", "Lawful Evil", "Lawful Good", "Lawful Neutral", "Neutral Evil", "Neutral", "Neutral Good"};
                 do {
-                    alignment = JOptionPane.showInputDialog(null, "Choose Alignment:", "Input", JOptionPane.INFORMATION_MESSAGE, null, alignmentList, alignmentList[0]);
+                    alignment = JOptionPane.showInputDialog(null, raceObject.get("alignment"), "Select Alignment", JOptionPane.INFORMATION_MESSAGE, null, alignmentList, alignmentList[0]);
                 } while (alignment == null);
+                charInfo.put("alignment", alignment);
 
                 String campaignName = JOptionPane.showInputDialog(null, "Enter Campaign Name (Optional):");
                 if (campaignName == null) {
                     campaignName = "";
                 }
+                charInfo.put("campaignName", campaignName);
+
+                JFileChooser saveLocation = new JFileChooser();
+                saveLocation.setCurrentDirectory(new java.io.File("./characters"));
+                saveLocation.setAcceptAllFileFilterUsed(false);
+                saveLocation.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                saveLocation.setDialogTitle("Folder to save character in");
+                int returnVal = saveLocation.showOpenDialog(DragonManager.this);
+                // if the user selected a file and didn't cancel
+                if (returnVal == JFileChooser.APPROVE_OPTION) {
+                    try {
+                        PrintWriter jsonFile = new PrintWriter(new File(saveLocation.getSelectedFile() + "/" + characterName.toLowerCase() + ".json"), "UTF-8");
+                        jsonFile.write(charInfo.toString(4));
+                        jsonFile.close();
+                    } catch (FileNotFoundException ex) {
+                        throw new RuntimeException(ex);
+                    } catch (UnsupportedEncodingException ex) {
+                        throw new RuntimeException(ex);
+                    }
+                }
             } else {
-                JOptionPane.showMessageDialog(null, "Cannot access API, unable to create characters!", "Error!", JOptionPane.INFORMATION_MESSAGE);
+                JOptionPane.showMessageDialog(null, "Cannot access API, unable to create characters!\nAre you connected to a stable wifi connection?", "Error!", JOptionPane.ERROR_MESSAGE);
             }
         } else if ("loadChar".equals(e.getActionCommand())) {
             System.out.println("loadCharacter");
@@ -258,6 +287,7 @@ public class DragonManager extends JFrame implements ActionListener {
             JFileChooser filePick = new JFileChooser();
             filePick.addChoosableFileFilter(new ImagesPicker());
             filePick.setAcceptAllFileFilterUsed(false);
+            filePick.setCurrentDirectory(new java.io.File("."));
             // Open the dialogue
             int returnVal = filePick.showOpenDialog(DragonManager.this);
             // if the user selected a file and didn't cancel
