@@ -7,10 +7,14 @@ import java.awt.*;
 import java.awt.event.*;
 import java.awt.image.*;
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.prefs.*;
 import com.formdev.flatlaf.*;
 import java.net.*;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.json.*;
 
 public class DragonManager extends JFrame implements ActionListener {
@@ -18,15 +22,28 @@ public class DragonManager extends JFrame implements ActionListener {
     // Get config file, or create if there isn't one
     public static Preferences prefs;
     public static BackgroundPanel bgObject;
+
     public static JRadioButtonMenuItem bgScaled;
     public static JRadioButtonMenuItem bgTiled;
     public static JRadioButtonMenuItem bgActual;
+
+
     static { // Static
         prefs = Preferences.userRoot().node(DragonManager.class.getName());
 
     }
     { // Not static
         bgObject = new BackgroundPanel(null, BackgroundPanel.SCALED, 0.0f, 0.0f);
+    }
+
+    public static JSONObject getJson(URL url) {
+        String json = null;
+        try {
+            json = IOUtils.toString(url, StandardCharsets.UTF_8);
+            return new JSONObject(json);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private boolean APIisReachable() {
@@ -172,7 +189,63 @@ public class DragonManager extends JFrame implements ActionListener {
     public void actionPerformed(ActionEvent e) {
         if ("newChar".equals(e.getActionCommand())) {
             if (APIisReachable()) {
-                System.out.println("API");
+                String characterName = "";
+                do {
+                    characterName = JOptionPane.showInputDialog(null, "Enter Character Name:");
+                }
+                while (characterName.isEmpty()); // Until the character's name isn't empty
+
+                JSONObject raceObject = null;
+                try {
+                    // Get full JSON and create arrays for full race objects and just race names for the JOptionMEnu
+                    JSONObject racesJSON = getJson(new URL("https://api.open5e.com/races/?format=json"));
+                    JSONObject[] racesArray = new JSONObject[racesJSON.getInt("count")]; // Create array that has space for however many values there are
+                    Object[] racesNames = new Object[racesJSON.getInt("count")];
+
+                    // Fill arrays
+                    for (int i = 0; i <= racesJSON.getInt("count") - 1; i++) { // Subtract 1 because including zero
+                        racesArray[i] = racesJSON.getJSONArray("results").getJSONObject(i);
+                        racesNames[i] = racesArray[i].get("name");
+                    }
+
+                    // Select race and make sure it's not empty
+                    Object race = null;
+                    do {
+                        race = JOptionPane.showInputDialog(null, "Choose Race:", "Input", JOptionPane.INFORMATION_MESSAGE, null, racesNames, racesNames[0]);
+                        if (race != null) {
+                            int raceIndex = ArrayUtils.indexOf(racesNames, race);
+                            raceObject = racesArray[raceIndex]; // Convert from name to full character JSONObject
+                        }
+                    }
+                    while (race == null);
+                } catch (MalformedURLException ex) {
+                    throw new RuntimeException(ex);
+                }
+
+                Integer characterLevel = 1;
+                // If is valid integer and >0 then it passes
+                do {
+                    String characterLevelStr = JOptionPane.showInputDialog(null, "Enter Character Level:", 1);
+                    try {
+                        characterLevel = Integer.parseInt(characterLevelStr);
+                    } catch (NumberFormatException nfe) {
+                        // If not valid number set to zero
+                        characterLevel = 0;
+                    }
+                }
+                while (characterLevel <= 0);
+
+
+                Object alignment = null;
+                Object[] alignmentList = {"Chaotic Evil", "Chaotic Good", "Chaotic Neutral", "Lawful Evil", "Lawful Good", "Lawful Neutral", "Neutral Evil", "Neutral", "Neutral Good"};
+                do {
+                    alignment = JOptionPane.showInputDialog(null, "Choose Alignment:", "Input", JOptionPane.INFORMATION_MESSAGE, null, alignmentList, alignmentList[0]);
+                } while (alignment == null);
+
+                String campaignName = JOptionPane.showInputDialog(null, "Enter Campaign Name (Optional):");
+                if (campaignName == null) {
+                    campaignName = "";
+                }
             } else {
                 JOptionPane.showMessageDialog(null, "Cannot access API, unable to create characters!", "Error!", JOptionPane.INFORMATION_MESSAGE);
             }
