@@ -147,6 +147,8 @@ public class DragonManager extends JFrame implements ActionListener {
                 bgPanel.setStyle(Scaling);
 
             } catch (IOException e) {
+                prefs.remove("wallpaper");
+                JOptionPane.showMessageDialog(null, "Can't access background image! Removing custom background.", "Error!", JOptionPane.ERROR_MESSAGE);
                 throw new RuntimeException(e);
             }
         } else {
@@ -730,6 +732,11 @@ public class DragonManager extends JFrame implements ActionListener {
                     } else {
                         UIManager.setLookAndFeel(new FlatLightLaf());
                     }
+                    // Make things rounder
+                    UIManager.put( "Button.arc", 10 );
+                    UIManager.put( "Component.arc", 10 );
+                    UIManager.put( "ProgressBar.arc", 10 );
+                    UIManager.put( "TextComponent.arc", 10 );
                 } catch( Exception ex ) {
                     System.err.println( "Failed to initialize LaF, " + ex);
                 }
