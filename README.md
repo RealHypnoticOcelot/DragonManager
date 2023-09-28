@@ -1,5 +1,5 @@
 # DragonManager
-###### Create and manage your DND Characters within an application!
+###### Create and manage your Dungeons and Dragons Characters within an application!
 
 ## How to use:
 All you should need to do is unzip the .zip for your operating system, and run the application inside! If you have an issue, [create one](https://github.com/RealHypnoticOcelot/DragonManager/issues/new) on GitHub so I can fix it.
