@@ -10,7 +10,7 @@ All you should need to do is unzip the .zip for your operating system, and run t
 
 - Set a custom background for the window, with three different scaling options
 
-- Change program theme - much of the ui is still incomplete
+- Change program theme - much of the UI is still incomplete
 
 ## How to build:
 
