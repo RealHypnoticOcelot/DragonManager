@@ -36,7 +36,7 @@ public class DragonManager extends JFrame implements ActionListener {
         bgObject = new BackgroundPanel(null, BackgroundPanel.SCALED, 0.0f, 0.0f);
     }
 
-    public static JSONObject getJson(URL url) {
+    public static JSONObject getJson(URI url) {
         String json = null;
         try {
             json = IOUtils.toString(url, StandardCharsets.UTF_8);
@@ -179,7 +179,7 @@ public class DragonManager extends JFrame implements ActionListener {
         }
     }
 
-    private Object[] namesAndData(URL apiURL) {
+    private Object[] namesAndData(URI apiURL) {
         JSONObject infoJSON = getJson(apiURL);
         JSONObject[] infoArray = new JSONObject[infoJSON.getInt("count")]; // Create array that has space for however many values there are
         Object[] infoNames = new Object[infoJSON.getInt("count")];
@@ -188,7 +188,6 @@ public class DragonManager extends JFrame implements ActionListener {
             infoArray[i] = infoJSON.getJSONArray("results").getJSONObject(i);
             infoNames[i] = infoArray[i].get("name");
         }
-        System.out.println(infoArray);
         return new Object[]{infoArray, infoNames};
     }
 
@@ -209,7 +208,7 @@ public class DragonManager extends JFrame implements ActionListener {
 
                 JSONObject raceObject = null;
                 try {
-                    Object[] info = namesAndData(new URL("https://api.open5e.com/races/?format=json"));
+                    Object[] info = namesAndData(new URI("https://api.open5e.com/races/?format=json"));
                     JSONObject[] racesArray = (JSONObject[]) info[0];
                     Object[] racesNames = (Object[]) info[1];
 
@@ -224,13 +223,13 @@ public class DragonManager extends JFrame implements ActionListener {
                     }
                     while (race == null);
                     charInfo.put("genericRaceInfo", raceObject); // All info about race
-                } catch (MalformedURLException ex) {
-                    throw new RuntimeException(ex);
+                } catch (URISyntaxException ex) {
+                    JOptionPane.showMessageDialog(null, ex, "Error!", JOptionPane.ERROR_MESSAGE);
                 }
 
                 JSONObject classObject = null;
                 try {
-                    Object[] info = namesAndData(new URL("https://api.open5e.com/classes/?format=json"));
+                    Object[] info = namesAndData(new URI("https://api.open5e.com/classes/?format=json"));
                     JSONObject[] classesArray = (JSONObject[]) info[0];
                     Object[] classesNames = (Object[]) info[1];
                     // Select class and make sure it's not empty
@@ -244,8 +243,8 @@ public class DragonManager extends JFrame implements ActionListener {
                     }
                     while (classes == null);
                     charInfo.put("genericClassInfo", classObject); // All info about race
-                } catch (MalformedURLException ex) {
-                    throw new RuntimeException(ex);
+                } catch (URISyntaxException ex) {
+                    JOptionPane.showMessageDialog(null, ex, "Error!", JOptionPane.ERROR_MESSAGE);
                 }
 
                 Integer characterLevel = 1;

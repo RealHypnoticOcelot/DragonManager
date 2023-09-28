@@ -54,7 +54,7 @@
                             <mainClass>lol.ocelot.dragonmanager.DragonManager</mainClass>
                             <!-- optional -->
                             <bundleJre>true</bundleJre>
-                            <jrePath>/Library/Java/JavaVirtualMachines/jdk-21.jdk/Contents/Home</jrePath>
+                            <jdkPath>/Users/hypnoticocelot/Downloads/Programming/Java/JDK/21/Windows/jdk-21</jdkPath>
                             <generateInstaller>false</generateInstaller>
                             <additionalResources>
                                 <additionalResource>characters/</additionalResource>
