@@ -8,6 +8,7 @@ import java.awt.event.*;
 import java.awt.image.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.prefs.*;
 import com.formdev.flatlaf.*;
@@ -20,22 +21,17 @@ import org.json.*;
 public class DragonManager extends JFrame implements ActionListener {
 
     // Get config file, or create if there isn't one
-    public static Preferences prefs;
-
-    public static JRadioButtonMenuItem bgScaled;
-    public static JRadioButtonMenuItem bgTiled;
-    public static JRadioButtonMenuItem bgActual;
-    public static ArrayList<BackgroundPanel> bgTabs = new ArrayList<BackgroundPanel>();
-
-
-    static { // Static
-        prefs = Preferences.userRoot().node(DragonManager.class.getName());
-    }
+    public static Preferences prefs = Preferences.userRoot().node(DragonManager.class.getName());
+    // The JRadioButtonMenuItems
+    public static JRadioButtonMenuItem bgScaled, bgTiled, bgActual;
+    // BackgroundPanels that are tabs
+    public static ArrayList<BackgroundPanel> bgTabs = new ArrayList<>();
+    // Components that are only enabled when no character is loaded
+    public static ArrayList<JComponent> noCharComponents = new ArrayList<>();
 
     public static JSONObject getJson(URI url) {
-        String json = null;
         try {
-            json = IOUtils.toString(url, StandardCharsets.UTF_8);
+            String json = IOUtils.toString(url, StandardCharsets.UTF_8);
             return new JSONObject(json);
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -129,12 +125,17 @@ public class DragonManager extends JFrame implements ActionListener {
         return menuBar;
     }
 
+    public void loadCharacter(JSONObject charInfo) {
+        System.out.println(charInfo.get("genericRaceInfo"));
+    }
+
     public void setBackground(ArrayList<BackgroundPanel> bgComponents) {
         if (!(prefs.get("wallpaper", null) == null)) {
             try {
                 for(BackgroundPanel i : bgComponents) {
                     BufferedImage bgImage = ImageIO.read(new File(prefs.get("wallpaper", null)));
-                    i.setImage(bgImage);
+                    BufferedImage tintedImage = darkenImage(bgImage);
+                    i.setImage(tintedImage);
                     int Scaling = prefs.getInt("scalingType", 0);
                     /*
                     0 = Scaled
@@ -181,14 +182,17 @@ public class DragonManager extends JFrame implements ActionListener {
         }
     }
 
-    private Object[] namesAndData(URI apiURL) {
-        JSONObject infoJSON = getJson(apiURL);
-        JSONObject[] infoArray = new JSONObject[infoJSON.getInt("count")]; // Create array that has space for however many values there are
-        Object[] infoNames = new Object[infoJSON.getInt("count")];
+    // Int instead of bool because it's easier, 0 means don't add a None option and 1 means add one
+    private Object[] namesAndData(JSONObject infoJSON, String key, int addNone) {
+        JSONObject[] infoArray = new JSONObject[infoJSON.getJSONArray(key).length()]; // Create array that has space for however many values there are
+        Object[] infoNames = new Object[infoJSON.getJSONArray(key).length() + addNone];
+        if (addNone == 1) {
+            infoNames[0] = "None";
+        }
 
-        for (int i = 0; i <= infoJSON.getInt("count") - 1; i++) { // Subtract 1 because including zero
-            infoArray[i] = infoJSON.getJSONArray("results").getJSONObject(i);
-            infoNames[i] = infoArray[i].get("name");
+        for (int i = 0; i <= infoJSON.getJSONArray(key).length() - 1; i++) { // Subtract 1 because including zero
+            infoArray[i] = infoJSON.getJSONArray(key).getJSONObject(i);
+            infoNames[i + addNone] = infoArray[i].get("name");
         }
         return new Object[]{infoArray, infoNames};
     }
@@ -198,6 +202,8 @@ public class DragonManager extends JFrame implements ActionListener {
         if ("newChar".equals(e.getActionCommand())) {
             if (APIisReachable()) {
                 JSONObject charInfo = new JSONObject();
+
+                // Name
                 String characterName = "";
                 do {
                     characterName = JOptionPane.showInputDialog(null, "Enter Character Name:");
@@ -210,9 +216,9 @@ public class DragonManager extends JFrame implements ActionListener {
 
                 JSONObject raceObject = null;
                 try {
-                    Object[] info = namesAndData(new URI("https://api.open5e.com/races/?format=json"));
-                    JSONObject[] racesArray = (JSONObject[]) info[0];
-                    Object[] racesNames = (Object[]) info[1];
+                    Object[] racesInfo = namesAndData(getJson(new URI("https://api.open5e.com/races/?format=json")), "results", 0);
+                    JSONObject[] racesArray = (JSONObject[]) racesInfo[0];
+                    Object[] racesNames = (Object[]) racesInfo[1];
 
                     // Select race and make sure it's not empty
                     Object race = null;
@@ -225,14 +231,35 @@ public class DragonManager extends JFrame implements ActionListener {
                     }
                     while (race == null);
                     charInfo.put("genericRaceInfo", raceObject); // All info about race
-                } catch (Exception ex) { // Generic because having issues with some errors
+
+                    // If there's subraces, then select one
+                    JSONObject subraceObject = null;
+                    if (!raceObject.get("subraces").toString().equals("[]")) {
+                        Object[] subraceInfo = namesAndData(raceObject, "subraces", 1);
+                        JSONObject[] subraceArray = (JSONObject[]) subraceInfo[0];
+                        Object[] subraceNames = (Object[]) subraceInfo[1];
+
+                        Object subrace = null;
+                        do {
+                            subrace = JOptionPane.showInputDialog(null, "Choose Subrace:", "Input", JOptionPane.INFORMATION_MESSAGE, null, subraceNames, subraceNames[0]);
+                            if (subrace != null && !subrace.equals("None")) {
+                                int subraceIndex = ArrayUtils.indexOf(subraceNames, subrace);
+                                subraceObject = subraceArray[subraceIndex - 1]; // Convert from name to full subrace JSONObject
+                                charInfo.put("genericSubraceInfo", subraceObject); // All info about race
+                            } else if (subrace.equals("None")) {
+                                charInfo.put("genericSubraceInfo", "");
+                            }
+                        }
+                        while (subrace == null);
+                    }
+                } catch (Exception ex) { // Generic just in case
                     JOptionPane.showMessageDialog(null, ex, "Error!", JOptionPane.ERROR_MESSAGE);
                     throw new RuntimeException(ex);
                 }
 
                 JSONObject classObject = null;
                 try {
-                    Object[] info = namesAndData(new URI("https://api.open5e.com/classes/?format=json"));
+                    Object[] info = namesAndData(getJson(new URI("https://api.open5e.com/classes/?format=json")), "results", 0);
                     JSONObject[] classesArray = (JSONObject[]) info[0];
                     Object[] classesNames = (Object[]) info[1];
                     // Select class and make sure it's not empty
@@ -257,7 +284,7 @@ public class DragonManager extends JFrame implements ActionListener {
                     try {
                         characterLevel = Integer.parseInt(characterLevelStr);
                     } catch (NumberFormatException nfe) {
-                        // If not valid number set to zero
+                        // If not valid number set to zero so it doesn't pass
                         characterLevel = 0;
                     }
                 }
@@ -278,6 +305,7 @@ public class DragonManager extends JFrame implements ActionListener {
                 }
                 charInfo.put("campaignName", campaignName);
 
+                // Save to file
                 JFileChooser saveLocation = new JFileChooser();
                 saveLocation.setCurrentDirectory(new java.io.File("./characters"));
                 saveLocation.setAcceptAllFileFilterUsed(false);
@@ -287,12 +315,12 @@ public class DragonManager extends JFrame implements ActionListener {
                 // if the user selected a file and didn't cancel
                 if (returnVal == JFileChooser.APPROVE_OPTION) {
                     try {
-                        PrintWriter jsonFile = new PrintWriter(new File(saveLocation.getSelectedFile() + "/" + characterName.toLowerCase().replace(" ", "_") + ".json"), "UTF-8");
+                        PrintWriter jsonFile = new PrintWriter(saveLocation.getSelectedFile() + "/" + characterName.toLowerCase().replace(" ", "_") + ".json", StandardCharsets.UTF_8);
                         jsonFile.write(charInfo.toString(4));
                         jsonFile.close();
-                    } catch (FileNotFoundException ex) {
-                        throw new RuntimeException(ex);
-                    } catch (UnsupportedEncodingException ex) {
+                        JSONObject charJSON = new JSONObject(charInfo.toString(4));
+                        loadCharacter(charJSON);
+                    } catch (IOException ex) {
                         throw new RuntimeException(ex);
                     }
                 }
@@ -301,13 +329,20 @@ public class DragonManager extends JFrame implements ActionListener {
             }
         } else if ("loadChar".equals(e.getActionCommand())) {
             JFileChooser saveLocation = new JFileChooser();
-            saveLocation.setCurrentDirectory(new java.io.File("./characters"));
+            saveLocation.setCurrentDirectory(new File("./characters"));
             saveLocation.setAcceptAllFileFilterUsed(false);
             saveLocation.addChoosableFileFilter(new jsonPicker());
             int returnVal = saveLocation.showOpenDialog(DragonManager.this);
+
             // if the user selected a file and didn't cancel
             if (returnVal == JFileChooser.APPROVE_OPTION) {
-                System.out.println("loadchar");
+                try {
+                    String charInfo = new String((Files.readAllBytes(saveLocation.getSelectedFile().toPath())));
+                    JSONObject charJSON = new JSONObject(charInfo);
+                    loadCharacter(charJSON);
+                } catch (IOException ex) {
+                    throw new RuntimeException(ex);
+                }
             }
         } else if ("changeBG".equals(e.getActionCommand())) {
             //Create File Chooser Object
@@ -521,11 +556,6 @@ public class DragonManager extends JFrame implements ActionListener {
         @Override
         public Dimension getPreferredSize()
         {
-//		Dimension panelSize = super.getPreferredSize();
-//		Dimension imageSize = getLayout().preferredLayoutSize(this);
-//		panelSize.width = Math.max(panelSize.width, imageSize.width);
-//		panelSize.height = Math.max(panelSize.height, imageSize.height);
-
             if (image == null)
                 return super.getPreferredSize();
             else
@@ -663,6 +693,13 @@ public class DragonManager extends JFrame implements ActionListener {
         }
     }
 
+    // Tint background image, taken from https://stackoverflow.com/questions/4248104/applying-a-tint-to-an-image-in-java
+    public BufferedImage darkenImage(BufferedImage originalImage) {
+        // Make 40% darker
+        RescaleOp filter = new RescaleOp(.6f, 0, null);
+        return filter.filter(originalImage, null);
+    }
+
     private JLabel createText(BackgroundPanel panel, String caption, GridBagConstraints constraints) {
         JLabel t = new JLabel(caption);
         panel.add(t, constraints);
@@ -696,18 +733,20 @@ public class DragonManager extends JFrame implements ActionListener {
         }
 
         // Create Main Menu and add it as a tab
-        BackgroundPanel mainScreen = new BackgroundPanel(null, BackgroundPanel.SCALED, 0.0f, 0.0f);;
+        BackgroundPanel mainScreen = new BackgroundPanel(null, BackgroundPanel.SCALED, 0.0f, 0.0f);
         bgTabs.add(mainScreen);
         mainScreen.setLayout(new GridBagLayout());
         tabbedPane.addTab("Character", mainScreen);
 
         // Same as above but with the Search menu
-        BackgroundPanel searchMenu = new BackgroundPanel(null, BackgroundPanel.SCALED, 0.0f, 0.0f);;
+        BackgroundPanel searchMenu = new BackgroundPanel(null, BackgroundPanel.SCALED, 0.0f, 0.0f);
         bgTabs.add(searchMenu);
         searchMenu.setLayout(new GridBagLayout());
         tabbedPane.addTab("Search", searchMenu);
 
+        // Add pane to frame and set background on tabs
         add(tabbedPane, BorderLayout.CENTER);
+        setBackground(bgTabs);
 
         // Create and set Menu Bar
         JMenuBar menu = createMenu();
