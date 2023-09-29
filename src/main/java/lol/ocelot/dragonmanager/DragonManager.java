@@ -12,7 +12,7 @@ import java.util.*;
 import java.util.prefs.*;
 import com.formdev.flatlaf.*;
 import java.net.*;
-
+import org.update4j.*;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
 import org.json.*;
@@ -21,19 +21,15 @@ public class DragonManager extends JFrame implements ActionListener {
 
     // Get config file, or create if there isn't one
     public static Preferences prefs;
-    public static BackgroundPanel bgObject;
 
     public static JRadioButtonMenuItem bgScaled;
     public static JRadioButtonMenuItem bgTiled;
     public static JRadioButtonMenuItem bgActual;
+    public static ArrayList<BackgroundPanel> bgTabs = new ArrayList<BackgroundPanel>();
 
 
     static { // Static
         prefs = Preferences.userRoot().node(DragonManager.class.getName());
-
-    }
-    { // Not static
-        bgObject = new BackgroundPanel(null, BackgroundPanel.SCALED, 0.0f, 0.0f);
     }
 
     public static JSONObject getJson(URI url) {
@@ -133,18 +129,20 @@ public class DragonManager extends JFrame implements ActionListener {
         return menuBar;
     }
 
-    public void setBackground(BackgroundPanel bgPanel) {
+    public void setBackground(ArrayList<BackgroundPanel> bgComponents) {
         if (!(prefs.get("wallpaper", null) == null)) {
             try {
-                BufferedImage bgImage = ImageIO.read(new File(prefs.get("wallpaper", null)));
-                bgPanel.setImage(bgImage);
-                int Scaling = prefs.getInt("scalingType", 0);
-                /*
+                for(BackgroundPanel i : bgComponents) {
+                    BufferedImage bgImage = ImageIO.read(new File(prefs.get("wallpaper", null)));
+                    i.setImage(bgImage);
+                    int Scaling = prefs.getInt("scalingType", 0);
+                    /*
                     0 = Scaled
                     1 = Tiled
                     2 = Actual Size
-                */
-                bgPanel.setStyle(Scaling);
+                    */
+                    i.setStyle(Scaling);
+                }
 
             } catch (IOException e) {
                 prefs.remove("wallpaper");
@@ -152,7 +150,9 @@ public class DragonManager extends JFrame implements ActionListener {
                 throw new RuntimeException(e);
             }
         } else {
-            bgPanel.setImage(null);
+            for(BackgroundPanel i : bgComponents) {
+                i.setImage(null);
+            }
         }
     }
 
@@ -177,7 +177,7 @@ public class DragonManager extends JFrame implements ActionListener {
                 bgScaled.setSelected(false);
                 bgTiled.setSelected(false);
             }
-            setBackground(bgObject);
+            setBackground(bgTabs);
         }
     }
 
@@ -225,8 +225,9 @@ public class DragonManager extends JFrame implements ActionListener {
                     }
                     while (race == null);
                     charInfo.put("genericRaceInfo", raceObject); // All info about race
-                } catch (URISyntaxException ex) {
+                } catch (Exception ex) { // Generic because having issues with some errors
                     JOptionPane.showMessageDialog(null, ex, "Error!", JOptionPane.ERROR_MESSAGE);
+                    throw new RuntimeException(ex);
                 }
 
                 JSONObject classObject = null;
@@ -245,7 +246,7 @@ public class DragonManager extends JFrame implements ActionListener {
                     }
                     while (classes == null);
                     charInfo.put("genericClassInfo", classObject); // All info about race
-                } catch (URISyntaxException ex) {
+                } catch (Exception ex) {
                     JOptionPane.showMessageDialog(null, ex, "Error!", JOptionPane.ERROR_MESSAGE);
                 }
 
@@ -320,11 +321,11 @@ public class DragonManager extends JFrame implements ActionListener {
             if (returnVal == JFileChooser.APPROVE_OPTION) {
                 File file = filePick.getSelectedFile();
                 prefs.put("wallpaper", file.getAbsolutePath());
-                setBackground(bgObject);
+                setBackground(bgTabs);
             }
         } else if ("resetBG".equals(e.getActionCommand())) {
             prefs.remove("wallpaper");
-            setBackground(bgObject);
+            setBackground(bgTabs);
         } else if ("themeToggle".equals(e.getActionCommand())) {
             try {
                 if (UIManager.getLookAndFeel().getName().equals("FlatLaf Light")) {
@@ -385,7 +386,8 @@ public class DragonManager extends JFrame implements ActionListener {
             if (extension != null) {
                 return extension.equals("jpeg") ||
                         extension.equals("jpg") ||
-                        extension.equals("png");
+                        extension.equals("png") ||
+                        extension.equals("webp");
             }
             return false;
         }
@@ -661,29 +663,26 @@ public class DragonManager extends JFrame implements ActionListener {
         }
     }
 
-    private JLabel createText(String caption, GridBagConstraints constraints) {
+    private JLabel createText(BackgroundPanel panel, String caption, GridBagConstraints constraints) {
         JLabel t = new JLabel(caption);
-        getContentPane().add(t, constraints);
+        panel.add(t, constraints);
         return t;
     }
-    private JButton createButton(String caption, GridBagConstraints constraints) {
+    private JButton createButton(BackgroundPanel panel, String caption, GridBagConstraints constraints) {
         JButton b = new JButton(caption);
         b.setActionCommand(caption);
-        getContentPane().add(b, constraints);
+        panel.add(b, constraints);
         return b;
     }
 
     public DragonManager() {
         super("DragonManager");
+        // Default settings, like padding and exit behavior
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
-        // Create background object and add it as a component
-        add(bgObject);
-        setBackground(bgObject); // Set background if there is ones
-        setContentPane(bgObject);
-
-        setLayout(new GridBagLayout());
         GridBagConstraints c = new GridBagConstraints();
+        c.insets = new Insets(3,0,3,0);
+        // Create tabbedpane for everything to be added to
+        JTabbedPane tabbedPane = new JTabbedPane();
 
         // Set Icon
         try {
@@ -696,25 +695,29 @@ public class DragonManager extends JFrame implements ActionListener {
             throw new RuntimeException(e);
         }
 
+        // Create Main Menu and add it as a tab
+        BackgroundPanel mainScreen = new BackgroundPanel(null, BackgroundPanel.SCALED, 0.0f, 0.0f);;
+        bgTabs.add(mainScreen);
+        mainScreen.setLayout(new GridBagLayout());
+        tabbedPane.addTab("Character", mainScreen);
+
+        // Same as above but with the Search menu
+        BackgroundPanel searchMenu = new BackgroundPanel(null, BackgroundPanel.SCALED, 0.0f, 0.0f);;
+        bgTabs.add(searchMenu);
+        searchMenu.setLayout(new GridBagLayout());
+        tabbedPane.addTab("Search", searchMenu);
+
+        add(tabbedPane, BorderLayout.CENTER);
+
         // Create and set Menu Bar
         JMenuBar menu = createMenu();
         setJMenuBar(menu);
-
-        c.insets = new Insets(3, 0,3,0);
-        createText("Welcome to DragonManager!", c);
-        c.gridy = 1;
-        JButton newCharBtn = createButton("New Character", c);
-        newCharBtn.setActionCommand("newChar");
-        newCharBtn.addActionListener(this);
-        c.gridy = 2;
-        JButton loadCharBtn = createButton("Load Character", c);
-        loadCharBtn.setActionCommand("loadChar");
-        loadCharBtn.addActionListener(this);
 
         // Set size
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         int screenHeight = (int) (screenSize.height * 0.75); // get height and width of the screen and make it 3/4
         int screenWidth = (int) (screenSize.width * 0.75);
+        mainScreen.setSize(new Dimension(screenWidth, screenHeight));
         setSize(new Dimension(screenWidth, screenHeight));
 
         // Display Window
@@ -737,6 +740,7 @@ public class DragonManager extends JFrame implements ActionListener {
                     UIManager.put( "Component.arc", 10 );
                     UIManager.put( "ProgressBar.arc", 10 );
                     UIManager.put( "TextComponent.arc", 10 );
+                    //
                 } catch( Exception ex ) {
                     System.err.println( "Failed to initialize LaF, " + ex);
                 }

@@ -36,6 +36,11 @@
             <artifactId>commons-lang3</artifactId>
             <version>3.12.0</version>
         </dependency>
+        <dependency>
+            <groupId>org.update4j</groupId>
+            <artifactId>update4j</artifactId>
+            <version>1.5.9</version>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
@@ -55,14 +60,17 @@
                             <!-- optional -->
                             <bundleJre>true</bundleJre>
                             <jdkPath>/Users/hypnoticocelot/Downloads/Programming/Java/JDK/21/Windows/jdk-21</jdkPath>
+                            <platform>windows</platform>
                             <generateInstaller>false</generateInstaller>
                             <additionalResources>
                                 <additionalResource>characters/</additionalResource>
                                 <additionalResource>homebrew/</additionalResource>
                             </additionalResources>
+                            <additionalModules>
+                                <additionalModule>jdk.crypto.ec</additionalModule>
+                            </additionalModules>
                             <copyDependencies>true</copyDependencies>
                             <administratorRequired>false</administratorRequired>
-                            <platform>windows</platform>
                             <createZipball>true</createZipball>
                         </configuration>
                     </execution>
