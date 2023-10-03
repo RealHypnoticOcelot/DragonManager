@@ -2,6 +2,8 @@ package lol.ocelot.dragonmanager;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 import javax.swing.filechooser.FileFilter;
 import java.awt.*;
 import java.awt.event.*;
@@ -28,6 +30,7 @@ public class DragonManager extends JFrame implements ActionListener {
     public static ArrayList<BackgroundPanel> bgTabs = new ArrayList<>();
     // Components that are only enabled when no character is loaded
     public static ArrayList<JComponent> noCharComponents = new ArrayList<>();
+    public static DefaultListModel searchResultsArray = new DefaultListModel();;
 
     public static JSONObject getJson(URI url) {
         try {
@@ -182,6 +185,60 @@ public class DragonManager extends JFrame implements ActionListener {
         }
     }
 
+    private class IndexChangeEvent implements ListSelectionListener {
+        private JList listObject;
+        public IndexChangeEvent(JList listObject) {
+            this.listObject = listObject;
+        }
+
+        public void valueChanged(ListSelectionEvent e) {
+            System.out.println(listObject.getSelectedIndex());
+        }
+    }
+    // Search action
+    private class SearchEvent implements ActionListener {
+        private JComboBox searchFilter;
+        private JProgressBar progressBar;
+        public SearchEvent(JComboBox searchFilter) {this.searchFilter = searchFilter;}
+
+        public void actionPerformed(ActionEvent e) {
+            if (APIisReachable()) {
+                Object[] searchFilterSlug = {"search", "spells", "monsters", "backgrounds", "planes", "feats", "conditions", "races", "classes", "magicitems", "weapons", "armor"};
+                JTextField searchBox = (JTextField) e.getSource();
+
+                JSONObject[] searchArray;
+                Object[] searchNames;
+
+                searchResultsArray.clear();
+                searchBox.setEditable(false);
+                // If using generic search instead of specific search
+                try {
+                    if (searchFilter.getSelectedIndex() == 0) {
+                        Object[] searchResults = namesAndData(getJson(new URI("https://api.open5e.com/" + searchFilterSlug[searchFilter.getSelectedIndex()] + "?format=json&text=" + searchBox.getText())), "results", 0);
+                        searchArray = (JSONObject[]) searchResults[0];
+                        searchNames = (Object[]) searchResults[1];
+                    } else {
+                        Object[] searchResults = namesAndData(getJson(new URI("https://api.open5e.com/" + searchFilterSlug[searchFilter.getSelectedIndex()] + "?format=json&search=" + searchBox.getText())), "results", 0);
+                        searchArray = (JSONObject[]) searchResults[0];
+                        searchNames = (Object[]) searchResults[1];
+                    }
+                } catch (URISyntaxException ex) {
+                    throw new RuntimeException(ex);
+                }
+                if (searchNames.length > 0) {
+                    for (Object i: searchNames) {
+                        searchResultsArray.addElement(i);
+                    }
+                } else {
+                    JOptionPane.showMessageDialog(null, "No Results Found!", "Error!", JOptionPane.ERROR_MESSAGE);
+                }
+                searchBox.setEditable(true);
+            } else {
+                JOptionPane.showMessageDialog(null, "Cannot access API, unable to use search!\nAre you connected to a stable wifi connection?", "Error!", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
     // Int instead of bool because it's easier, 0 means don't add a None option and 1 means add one
     private Object[] namesAndData(JSONObject infoJSON, String key, int addNone) {
         JSONObject[] infoArray = new JSONObject[infoJSON.getJSONArray(key).length()]; // Create array that has space for however many values there are
@@ -204,7 +261,7 @@ public class DragonManager extends JFrame implements ActionListener {
                 JSONObject charInfo = new JSONObject();
 
                 // Name
-                String characterName = "";
+                String characterName;
                 do {
                     characterName = JOptionPane.showInputDialog(null, "Enter Character Name:");
                     if (characterName == null) {
@@ -221,7 +278,7 @@ public class DragonManager extends JFrame implements ActionListener {
                     Object[] racesNames = (Object[]) racesInfo[1];
 
                     // Select race and make sure it's not empty
-                    Object race = null;
+                    Object race;
                     do {
                         race = JOptionPane.showInputDialog(null, "Choose Race:", "Input", JOptionPane.INFORMATION_MESSAGE, null, racesNames, racesNames[0]);
                         if (race != null) {
@@ -233,21 +290,23 @@ public class DragonManager extends JFrame implements ActionListener {
                     charInfo.put("genericRaceInfo", raceObject); // All info about race
 
                     // If there's subraces, then select one
-                    JSONObject subraceObject = null;
+                    JSONObject subraceObject;
                     if (!raceObject.get("subraces").toString().equals("[]")) {
                         Object[] subraceInfo = namesAndData(raceObject, "subraces", 1);
                         JSONObject[] subraceArray = (JSONObject[]) subraceInfo[0];
                         Object[] subraceNames = (Object[]) subraceInfo[1];
 
-                        Object subrace = null;
+                        Object subrace;
                         do {
                             subrace = JOptionPane.showInputDialog(null, "Choose Subrace:", "Input", JOptionPane.INFORMATION_MESSAGE, null, subraceNames, subraceNames[0]);
-                            if (subrace != null && !subrace.equals("None")) {
-                                int subraceIndex = ArrayUtils.indexOf(subraceNames, subrace);
-                                subraceObject = subraceArray[subraceIndex - 1]; // Convert from name to full subrace JSONObject
-                                charInfo.put("genericSubraceInfo", subraceObject); // All info about race
-                            } else if (subrace.equals("None")) {
-                                charInfo.put("genericSubraceInfo", "");
+                            if (subrace != null) {
+                                if (!subrace.equals("None")) {
+                                    int subraceIndex = ArrayUtils.indexOf(subraceNames, subrace);
+                                    subraceObject = subraceArray[subraceIndex - 1]; // Convert from name to full subrace JSONObject
+                                    charInfo.put("genericSubraceInfo", subraceObject); // All info about race
+                                } else {
+                                    charInfo.put("genericSubraceInfo", "");
+                                }
                             }
                         }
                         while (subrace == null);
@@ -263,7 +322,7 @@ public class DragonManager extends JFrame implements ActionListener {
                     JSONObject[] classesArray = (JSONObject[]) info[0];
                     Object[] classesNames = (Object[]) info[1];
                     // Select class and make sure it's not empty
-                    Object classes = null;
+                    Object classes;
                     do {
                         classes = JOptionPane.showInputDialog(null, "Choose Class:", "Input", JOptionPane.INFORMATION_MESSAGE, null, classesNames, classesNames[0]);
                         if (classes != null) {
@@ -277,7 +336,7 @@ public class DragonManager extends JFrame implements ActionListener {
                     JOptionPane.showMessageDialog(null, ex, "Error!", JOptionPane.ERROR_MESSAGE);
                 }
 
-                Integer characterLevel = 1;
+                Integer characterLevel;
                 // If is valid integer and >0 then it passes
                 do {
                     String characterLevelStr = JOptionPane.showInputDialog(null, "Enter Character Level:", 1);
@@ -292,7 +351,7 @@ public class DragonManager extends JFrame implements ActionListener {
                 charInfo.put("level", characterLevel);
 
 
-                Object alignment = null;
+                Object alignment;
                 Object[] alignmentList = {"Chaotic Evil", "Chaotic Good", "Chaotic Neutral", "Lawful Evil", "Lawful Good", "Lawful Neutral", "Neutral Evil", "Neutral", "Neutral Good"};
                 do {
                     alignment = JOptionPane.showInputDialog(null, raceObject.get("alignment"), "Select Alignment", JOptionPane.INFORMATION_MESSAGE, null, alignmentList, alignmentList[0]);
@@ -705,19 +764,26 @@ public class DragonManager extends JFrame implements ActionListener {
         panel.add(t, constraints);
         return t;
     }
-    private JButton createButton(BackgroundPanel panel, String caption, GridBagConstraints constraints) {
+    private JButton createButton(BackgroundPanel panel, String caption, String actionCommand, GridBagConstraints constraints) {
         JButton b = new JButton(caption);
-        b.setActionCommand(caption);
+        b.setActionCommand(actionCommand);
+        b.addActionListener(this);
         panel.add(b, constraints);
         return b;
+    }
+
+    private JTextField createTextField(BackgroundPanel panel, String actionCommand, GridBagConstraints constraints) {
+        JTextField tf = new JTextField();
+        tf.setActionCommand(actionCommand);
+        tf.addActionListener(this);
+        panel.add(tf, constraints);
+        return tf;
     }
 
     public DragonManager() {
         super("DragonManager");
         // Default settings, like padding and exit behavior
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        GridBagConstraints c = new GridBagConstraints();
-        c.insets = new Insets(3,0,3,0);
         // Create tabbedpane for everything to be added to
         JTabbedPane tabbedPane = new JTabbedPane();
 
@@ -744,6 +810,56 @@ public class DragonManager extends JFrame implements ActionListener {
         searchMenu.setLayout(new GridBagLayout());
         tabbedPane.addTab("Search", searchMenu);
 
+        // Create search menu components
+
+        // Search Filter
+        String[] searchFilterList = {"All", "Spells", "Monsters", "Backgrounds", "Planes", "Feats", "Conditions", "Races", "Classes", "Magic Items", "Weapons", "Armor"};
+
+        GridBagConstraints searchFilterConstraints = new GridBagConstraints();
+        searchFilterConstraints.insets = new Insets(10, 3, 5, 10);
+        searchFilterConstraints.fill = GridBagConstraints.HORIZONTAL;
+        searchFilterConstraints.gridx = 1;
+        searchFilterConstraints.weightx = 0.4;
+        JComboBox searchFilter = new JComboBox(searchFilterList);
+
+        // Search Box
+        GridBagConstraints searchBoxConstraints = new GridBagConstraints();
+        searchBoxConstraints.insets = new Insets(10, 10, 5, 3);
+        searchBoxConstraints.fill = GridBagConstraints.HORIZONTAL;
+        searchBoxConstraints.weightx = 0.6;
+        JTextField searchBox = new JTextField();
+        searchBox.addActionListener(new SearchEvent(searchFilter));
+
+        // Search Results
+        GridBagConstraints searchResultConstraints = new GridBagConstraints();
+        searchResultConstraints.insets = new Insets(5, 10, 3, 10);
+        searchResultConstraints.gridy = 1;
+        searchResultConstraints.fill = GridBagConstraints.BOTH;
+        searchResultConstraints.weighty = 1;
+        searchResultConstraints.weightx = 0.4;
+        JList searchResultsList = new JList(searchResultsArray);
+        searchResultsList.addListSelectionListener(new IndexChangeEvent(searchResultsList));
+        JScrollPane resultsPane = new JScrollPane();
+        resultsPane.setBorder(null);
+        resultsPane.setViewportView(searchResultsList);
+
+        // Result Data
+        GridBagConstraints resultInfoConstraints = new GridBagConstraints();
+        resultInfoConstraints.insets = new Insets(5, 10, 3, 10);
+        resultInfoConstraints.gridy = 1;
+        resultInfoConstraints.gridx = 1;
+        resultInfoConstraints.weightx = 0.4;
+        resultInfoConstraints.fill = GridBagConstraints.BOTH;
+        JScrollPane resultInfoPane = new JScrollPane();
+        resultInfoPane.setBorder(null);
+
+
+        // Add in order
+        searchMenu.add(searchBox, searchBoxConstraints);
+        searchMenu.add(searchFilter, searchFilterConstraints);
+        searchMenu.add(resultsPane, searchResultConstraints);
+        searchMenu.add(resultInfoPane, resultInfoConstraints);
+
         // Add pane to frame and set background on tabs
         add(tabbedPane, BorderLayout.CENTER);
         setBackground(bgTabs);
@@ -757,6 +873,7 @@ public class DragonManager extends JFrame implements ActionListener {
         int screenHeight = (int) (screenSize.height * 0.75); // get height and width of the screen and make it 3/4
         int screenWidth = (int) (screenSize.width * 0.75);
         mainScreen.setSize(new Dimension(screenWidth, screenHeight));
+        searchMenu.setSize(new Dimension(screenWidth, screenHeight));
         setSize(new Dimension(screenWidth, screenHeight));
 
         // Display Window
