@@ -13,8 +13,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.prefs.*;
+
 import com.formdev.flatlaf.*;
+
 import java.net.*;
+
 import org.update4j.*;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -30,7 +33,107 @@ public class DragonManager extends JFrame implements ActionListener {
     public static ArrayList<BackgroundPanel> bgTabs = new ArrayList<>();
     // Components that are only enabled when no character is loaded
     public static ArrayList<JComponent> noCharComponents = new ArrayList<>();
-    public static DefaultListModel searchResultsArray = new DefaultListModel();;
+    public static DefaultListModel searchResultsArray = new DefaultListModel();
+
+    public DragonManager() {
+        super("DragonManager");
+        // Default settings, like padding and exit behavior
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        // Create tabbedpane for everything to be added to
+        JTabbedPane tabbedPane = new JTabbedPane();
+
+        // Set Icon
+        try {
+            if (System.getProperty("os.name").toLowerCase().contains("mac")) {
+                Taskbar.getTaskbar().setIconImage(ImageIO.read(getClass().getResourceAsStream("/DragonManager.png"))); // set icon image if on macos
+            } else {
+                setIconImage(ImageIO.read(getClass().getResourceAsStream("/DragonManager.png"))); // set icon image if not on macos
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
+        // Create Main Menu and add it as a tab
+        BackgroundPanel mainScreen = new BackgroundPanel(null, BackgroundPanel.SCALED, 0.0f, 0.0f);
+        bgTabs.add(mainScreen);
+        mainScreen.setLayout(new GridBagLayout());
+        tabbedPane.addTab("Character", mainScreen);
+
+        // Same as above but with the Search menu
+        BackgroundPanel searchMenu = new BackgroundPanel(null, BackgroundPanel.SCALED, 0.0f, 0.0f);
+        bgTabs.add(searchMenu);
+        searchMenu.setLayout(new GridBagLayout());
+        tabbedPane.addTab("Search", searchMenu);
+
+        // Create search menu components
+
+        // Search Filter
+        String[] searchFilterList = {"All", "Spells", "Monsters", "Backgrounds", "Planes", "Feats", "Conditions", "Races", "Classes", "Magic Items", "Weapons", "Armor"};
+
+        GridBagConstraints searchFilterConstraints = new GridBagConstraints();
+        searchFilterConstraints.insets = new Insets(10, 3, 5, 10);
+        searchFilterConstraints.fill = GridBagConstraints.HORIZONTAL;
+        searchFilterConstraints.gridx = 1;
+        searchFilterConstraints.weightx = 0.4;
+        JComboBox searchFilter = new JComboBox(searchFilterList);
+
+        // Search Box
+        GridBagConstraints searchBoxConstraints = new GridBagConstraints();
+        searchBoxConstraints.insets = new Insets(10, 10, 5, 3);
+        searchBoxConstraints.fill = GridBagConstraints.HORIZONTAL;
+        searchBoxConstraints.weightx = 0.6;
+        JTextField searchBox = new JTextField();
+        searchBox.addActionListener(new SearchEvent(searchFilter));
+
+        // Search Results
+        GridBagConstraints searchResultConstraints = new GridBagConstraints();
+        searchResultConstraints.insets = new Insets(5, 10, 3, 10);
+        searchResultConstraints.gridy = 1;
+        searchResultConstraints.fill = GridBagConstraints.BOTH;
+        searchResultConstraints.weighty = 1;
+        searchResultConstraints.weightx = 0.4;
+        JList searchResultsList = new JList(searchResultsArray);
+        searchResultsList.addListSelectionListener(new IndexChangeEvent(searchResultsList));
+        JScrollPane resultsPane = new JScrollPane();
+        resultsPane.setBorder(null);
+        resultsPane.setViewportView(searchResultsList);
+
+        // Result Data
+        GridBagConstraints resultInfoConstraints = new GridBagConstraints();
+        resultInfoConstraints.insets = new Insets(5, 10, 3, 10);
+        resultInfoConstraints.gridy = 1;
+        resultInfoConstraints.gridx = 1;
+        resultInfoConstraints.weightx = 0.4;
+        resultInfoConstraints.fill = GridBagConstraints.BOTH;
+        JScrollPane resultInfoPane = new JScrollPane();
+        resultInfoPane.setBorder(null);
+
+
+        // Add in order
+        searchMenu.add(searchBox, searchBoxConstraints);
+        searchMenu.add(searchFilter, searchFilterConstraints);
+        searchMenu.add(resultsPane, searchResultConstraints);
+        searchMenu.add(resultInfoPane, resultInfoConstraints);
+
+        // Add pane to frame and set background on tabs
+        add(tabbedPane, BorderLayout.CENTER);
+        setBackground(bgTabs);
+
+        // Create and set Menu Bar
+        JMenuBar menu = createMenu();
+        setJMenuBar(menu);
+
+        // Set size
+        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
+        int screenHeight = (int) (screenSize.height * 0.75); // get height and width of the screen and make it 3/4
+        int screenWidth = (int) (screenSize.width * 0.75);
+        mainScreen.setSize(new Dimension(screenWidth, screenHeight));
+        searchMenu.setSize(new Dimension(screenWidth, screenHeight));
+        setSize(new Dimension(screenWidth, screenHeight));
+
+        // Display Window
+        setVisible(true);
+    }
 
     public static JSONObject getJson(URI url) {
         try {
@@ -41,12 +144,37 @@ public class DragonManager extends JFrame implements ActionListener {
         }
     }
 
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(new Runnable() {
+            public void run() {
+                // Set theme for application if a preference is set
+                try {
+                    if (Objects.equals(prefs.get("theme", null), "dark")) { // use == because it can be null
+                        UIManager.setLookAndFeel(new FlatDarkLaf());
+                    } else {
+                        UIManager.setLookAndFeel(new FlatLightLaf());
+                    }
+                    // Make things rounder
+                    UIManager.put("Button.arc", 10);
+                    UIManager.put("Component.arc", 10);
+                    UIManager.put("ProgressBar.arc", 10);
+                    UIManager.put("TextComponent.arc", 10);
+                    //
+                } catch (Exception ex) {
+                    System.err.println("Failed to initialize LaF, " + ex);
+                }
+                System.setProperty("apple.laf.useScreenMenuBar", "true"); // If on macOS make menu bar show up top
+                new DragonManager();
+            }
+        });
+    }
+
     private boolean APIisReachable() {
         // Get whether open5e is available
         try {
-            return(InetAddress.getByName("api.open5e.com").isReachable(1000));
+            return (InetAddress.getByName("api.open5e.com").isReachable(1000));
         } catch (IOException e) {
-            return(false);
+            return (false);
         }
     }
 
@@ -135,7 +263,7 @@ public class DragonManager extends JFrame implements ActionListener {
     public void setBackground(ArrayList<BackgroundPanel> bgComponents) {
         if (!(prefs.get("wallpaper", null) == null)) {
             try {
-                for(BackgroundPanel i : bgComponents) {
+                for (BackgroundPanel i : bgComponents) {
                     BufferedImage bgImage = ImageIO.read(new File(prefs.get("wallpaper", null)));
                     BufferedImage tintedImage = darkenImage(bgImage);
                     i.setImage(tintedImage);
@@ -154,87 +282,8 @@ public class DragonManager extends JFrame implements ActionListener {
                 throw new RuntimeException(e);
             }
         } else {
-            for(BackgroundPanel i : bgComponents) {
+            for (BackgroundPanel i : bgComponents) {
                 i.setImage(null);
-            }
-        }
-    }
-
-    // Actions from scaling menus
-    private class ScalingEvent implements ActionListener {
-        private int ScaleValue;
-        public ScalingEvent(int ScaleValue) {
-            this.ScaleValue = ScaleValue;
-        }
-
-        public void actionPerformed(ActionEvent e) {
-            prefs.putInt("scalingType", ScaleValue);
-
-            // Spaghetti code to uncheck the other selections when another is selected
-            if (ScaleValue == 0) {
-                bgTiled.setSelected(false);
-                bgActual.setSelected(false);
-            } else if (ScaleValue == 1) {
-                bgScaled.setSelected(false);
-                bgActual.setSelected(false);
-            } else if (ScaleValue == 2) {
-                bgScaled.setSelected(false);
-                bgTiled.setSelected(false);
-            }
-            setBackground(bgTabs);
-        }
-    }
-
-    private class IndexChangeEvent implements ListSelectionListener {
-        private JList listObject;
-        public IndexChangeEvent(JList listObject) {
-            this.listObject = listObject;
-        }
-
-        public void valueChanged(ListSelectionEvent e) {
-            System.out.println(listObject.getSelectedIndex());
-        }
-    }
-    // Search action
-    private class SearchEvent implements ActionListener {
-        private JComboBox searchFilter;
-        private JProgressBar progressBar;
-        public SearchEvent(JComboBox searchFilter) {this.searchFilter = searchFilter;}
-
-        public void actionPerformed(ActionEvent e) {
-            if (APIisReachable()) {
-                Object[] searchFilterSlug = {"search", "spells", "monsters", "backgrounds", "planes", "feats", "conditions", "races", "classes", "magicitems", "weapons", "armor"};
-                JTextField searchBox = (JTextField) e.getSource();
-
-                JSONObject[] searchArray;
-                Object[] searchNames;
-
-                searchResultsArray.clear();
-                searchBox.setEditable(false);
-                // If using generic search instead of specific search
-                try {
-                    if (searchFilter.getSelectedIndex() == 0) {
-                        Object[] searchResults = namesAndData(getJson(new URI("https://api.open5e.com/" + searchFilterSlug[searchFilter.getSelectedIndex()] + "?format=json&text=" + searchBox.getText())), "results", 0);
-                        searchArray = (JSONObject[]) searchResults[0];
-                        searchNames = (Object[]) searchResults[1];
-                    } else {
-                        Object[] searchResults = namesAndData(getJson(new URI("https://api.open5e.com/" + searchFilterSlug[searchFilter.getSelectedIndex()] + "?format=json&search=" + searchBox.getText())), "results", 0);
-                        searchArray = (JSONObject[]) searchResults[0];
-                        searchNames = (Object[]) searchResults[1];
-                    }
-                } catch (URISyntaxException ex) {
-                    throw new RuntimeException(ex);
-                }
-                if (searchNames.length > 0) {
-                    for (Object i: searchNames) {
-                        searchResultsArray.addElement(i);
-                    }
-                } else {
-                    JOptionPane.showMessageDialog(null, "No Results Found!", "Error!", JOptionPane.ERROR_MESSAGE);
-                }
-                searchBox.setEditable(true);
-            } else {
-                JOptionPane.showMessageDialog(null, "Cannot access API, unable to use search!\nAre you connected to a stable wifi connection?", "Error!", JOptionPane.ERROR_MESSAGE);
             }
         }
     }
@@ -436,6 +485,120 @@ public class DragonManager extends JFrame implements ActionListener {
         }
     }
 
+    // Tint background image, taken from https://stackoverflow.com/questions/4248104/applying-a-tint-to-an-image-in-java
+    public BufferedImage darkenImage(BufferedImage originalImage) {
+        // Make 40% darker
+        RescaleOp filter = new RescaleOp(.6f, 0, null);
+        return filter.filter(originalImage, null);
+    }
+
+    private JLabel createText(BackgroundPanel panel, String caption, GridBagConstraints constraints) {
+        JLabel t = new JLabel(caption);
+        panel.add(t, constraints);
+        return t;
+    }
+
+    private JButton createButton(BackgroundPanel panel, String caption, String actionCommand, GridBagConstraints constraints) {
+        JButton b = new JButton(caption);
+        b.setActionCommand(actionCommand);
+        b.addActionListener(this);
+        panel.add(b, constraints);
+        return b;
+    }
+
+    private JTextField createTextField(BackgroundPanel panel, String actionCommand, GridBagConstraints constraints) {
+        JTextField tf = new JTextField();
+        tf.setActionCommand(actionCommand);
+        tf.addActionListener(this);
+        panel.add(tf, constraints);
+        return tf;
+    }
+
+    // Actions from scaling menus
+    private class ScalingEvent implements ActionListener {
+        private final int ScaleValue;
+
+        public ScalingEvent(int ScaleValue) {
+            this.ScaleValue = ScaleValue;
+        }
+
+        public void actionPerformed(ActionEvent e) {
+            prefs.putInt("scalingType", ScaleValue);
+
+            // Spaghetti code to uncheck the other selections when another is selected
+            if (ScaleValue == 0) {
+                bgTiled.setSelected(false);
+                bgActual.setSelected(false);
+            } else if (ScaleValue == 1) {
+                bgScaled.setSelected(false);
+                bgActual.setSelected(false);
+            } else if (ScaleValue == 2) {
+                bgScaled.setSelected(false);
+                bgTiled.setSelected(false);
+            }
+            setBackground(bgTabs);
+        }
+    }
+
+    private class IndexChangeEvent implements ListSelectionListener {
+        private final JList listObject;
+
+        public IndexChangeEvent(JList listObject) {
+            this.listObject = listObject;
+        }
+
+        public void valueChanged(ListSelectionEvent e) {
+            System.out.println(listObject.getSelectedIndex());
+        }
+    }
+
+    // Search action
+    private class SearchEvent implements ActionListener {
+        private final JComboBox searchFilter;
+        private JProgressBar progressBar;
+
+        public SearchEvent(JComboBox searchFilter) {
+            this.searchFilter = searchFilter;
+        }
+
+        public void actionPerformed(ActionEvent e) {
+            if (APIisReachable()) {
+                Object[] searchFilterSlug = {"search", "spells", "monsters", "backgrounds", "planes", "feats", "conditions", "races", "classes", "magicitems", "weapons", "armor"};
+                JTextField searchBox = (JTextField) e.getSource();
+
+                JSONObject[] searchArray;
+                Object[] searchNames;
+
+                searchResultsArray.clear();
+                searchBox.setEditable(false);
+                // If using generic search instead of specific search
+                try {
+                    if (searchFilter.getSelectedIndex() == 0) {
+                        Object[] searchResults = namesAndData(getJson(new URI("https://api.open5e.com/" + searchFilterSlug[searchFilter.getSelectedIndex()] + "?format=json&text=" + searchBox.getText())), "results", 0);
+                        searchArray = (JSONObject[]) searchResults[0];
+                        searchNames = (Object[]) searchResults[1];
+                    } else {
+                        Object[] searchResults = namesAndData(getJson(new URI("https://api.open5e.com/" + searchFilterSlug[searchFilter.getSelectedIndex()] + "?format=json&search=" + searchBox.getText())), "results", 0);
+                        searchArray = (JSONObject[]) searchResults[0];
+                        searchNames = (Object[]) searchResults[1];
+                    }
+                } catch (URISyntaxException ex) {
+                    throw new RuntimeException(ex);
+                }
+                if (searchNames.length > 0) {
+                    for (Object i : searchNames) {
+                        searchResultsArray.addElement(i);
+                    }
+                } else {
+                    JOptionPane.showMessageDialog(null, "No Results Found!", "Error!", JOptionPane.ERROR_MESSAGE);
+                }
+                searchBox.setEditable(true);
+            } else {
+                JOptionPane.showMessageDialog(null, "Cannot access API, unable to use search!\nAre you connected to a stable wifi connection?", "Error!", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
     // Only accept json
     class jsonPicker extends FileFilter {
         @Override
@@ -461,8 +624,8 @@ public class DragonManager extends JFrame implements ActionListener {
             String s = f.getName();
             int i = s.lastIndexOf('.');
 
-            if (i > 0 &&  i < s.length() - 1) {
-                ext = s.substring(i+1).toLowerCase();
+            if (i > 0 && i < s.length() - 1) {
+                ext = s.substring(i + 1).toLowerCase();
             }
             return ext;
         }
@@ -496,16 +659,15 @@ public class DragonManager extends JFrame implements ActionListener {
             String s = f.getName();
             int i = s.lastIndexOf('.');
 
-            if (i > 0 &&  i < s.length() - 1) {
-                ext = s.substring(i+1).toLowerCase();
+            if (i > 0 && i < s.length() - 1) {
+                ext = s.substring(i + 1).toLowerCase();
             }
             return ext;
         }
     }
 
     // Set Background Image of menu properly, copied from https://tips4java.wordpress.com/2008/10/12/background-panel/
-    public class BackgroundPanel extends JPanel
-    {
+    public class BackgroundPanel extends JPanel {
         public static final int SCALED = 0;
         public static final int TILED = 1;
         public static final int ACTUAL = 2;
@@ -520,47 +682,42 @@ public class DragonManager extends JFrame implements ActionListener {
         /*
          *  Set image as the background with the SCALED style
          */
-        public BackgroundPanel(Image image)
-        {
+        public BackgroundPanel(Image image) {
             this(image, SCALED);
         }
 
         /*
          *  Set image as the background with the specified style
          */
-        public BackgroundPanel(Image image, int style)
-        {
-            setImage( image );
-            setStyle( style );
-            setLayout( new BorderLayout() );
+        public BackgroundPanel(Image image, int style) {
+            setImage(image);
+            setStyle(style);
+            setLayout(new BorderLayout());
         }
 
         /*
          *  Set image as the backround with the specified style and alignment
          */
-        public BackgroundPanel(Image image, int style, float alignmentX, float alignmentY)
-        {
-            setImage( image );
-            setStyle( style );
-            setImageAlignmentX( alignmentX );
-            setImageAlignmentY( alignmentY );
-            setLayout( new BorderLayout() );
+        public BackgroundPanel(Image image, int style, float alignmentX, float alignmentY) {
+            setImage(image);
+            setStyle(style);
+            setImageAlignmentX(alignmentX);
+            setImageAlignmentY(alignmentY);
+            setLayout(new BorderLayout());
         }
 
         /*
          *  Use the Paint interface to paint a background
          */
-        public BackgroundPanel(Paint painter)
-        {
-            setPaint( painter );
-            setLayout( new BorderLayout() );
+        public BackgroundPanel(Paint painter) {
+            setPaint(painter);
+            setLayout(new BorderLayout());
         }
 
         /*
          *	Set the image used as the background
          */
-        public void setImage(Image image)
-        {
+        public void setImage(Image image) {
             this.image = image;
             repaint();
         }
@@ -568,8 +725,7 @@ public class DragonManager extends JFrame implements ActionListener {
         /*
          *	Set the style used to paint the background image
          */
-        public void setStyle(int style)
-        {
+        public void setStyle(int style) {
             this.style = style;
             repaint();
         }
@@ -577,8 +733,7 @@ public class DragonManager extends JFrame implements ActionListener {
         /*
          *	Set the Paint object used to paint the background
          */
-        public void setPaint(Paint painter)
-        {
+        public void setPaint(Paint painter) {
             this.painter = painter;
             repaint();
         }
@@ -586,8 +741,7 @@ public class DragonManager extends JFrame implements ActionListener {
         /*
          *  Specify the horizontal alignment of the image when using ACTUAL style
          */
-        public void setImageAlignmentX(float alignmentX)
-        {
+        public void setImageAlignmentX(float alignmentX) {
             this.alignmentX = alignmentX > 1.0f ? 1.0f : alignmentX < 0.0f ? 0.0f : alignmentX;
             repaint();
         }
@@ -595,8 +749,7 @@ public class DragonManager extends JFrame implements ActionListener {
         /*
          *  Specify the horizontal alignment of the image when using ACTUAL style
          */
-        public void setImageAlignmentY(float alignmentY)
-        {
+        public void setImageAlignmentY(float alignmentY) {
             this.alignmentY = alignmentY > 1.0f ? 1.0f : alignmentY < 0.0f ? 0.0f : alignmentY;
             repaint();
         }
@@ -604,8 +757,7 @@ public class DragonManager extends JFrame implements ActionListener {
         /*
          *  Override method so we can make the component transparent
          */
-        public void add(JComponent component)
-        {
+        public void add(JComponent component) {
             add(component, null);
         }
 
@@ -613,8 +765,7 @@ public class DragonManager extends JFrame implements ActionListener {
          *  Override to provide a preferred size equal to the image size
          */
         @Override
-        public Dimension getPreferredSize()
-        {
+        public Dimension getPreferredSize() {
             if (image == null)
                 return super.getPreferredSize();
             else
@@ -624,10 +775,8 @@ public class DragonManager extends JFrame implements ActionListener {
         /*
          *  Override method so we can make the component transparent
          */
-        public void add(JComponent component, Object constraints)
-        {
-            if (isTransparentAdd)
-            {
+        public void add(JComponent component, Object constraints) {
+            if (isTransparentAdd) {
                 makeComponentTransparent(component);
             }
 
@@ -639,8 +788,7 @@ public class DragonManager extends JFrame implements ActionListener {
          *  be made transparent. That is, setOpaque(false) will be invoked.
          *  The default is set to true.
          */
-        public void setTransparentAdd(boolean isTransparentAdd)
-        {
+        public void setTransparentAdd(boolean isTransparentAdd) {
             this.isTransparentAdd = isTransparentAdd;
         }
 
@@ -650,19 +798,16 @@ public class DragonManager extends JFrame implements ActionListener {
          *  change the renderer to be transparent. An easy way to do this it to
          *  set the background of the table to a Color using an alpha value of 0.
          */
-        private void makeComponentTransparent(JComponent component)
-        {
-            component.setOpaque( false );
+        private void makeComponentTransparent(JComponent component) {
+            component.setOpaque(false);
 
-            if (component instanceof JScrollPane scrollPane)
-            {
+            if (component instanceof JScrollPane scrollPane) {
                 JViewport viewport = scrollPane.getViewport();
-                viewport.setOpaque( false );
+                viewport.setOpaque(false);
                 Component c = viewport.getView();
 
-                if (c instanceof JComponent)
-                {
-                    ((JComponent)c).setOpaque( false );
+                if (c instanceof JComponent) {
+                    ((JComponent) c).setOpaque(false);
                 }
             }
         }
@@ -671,35 +816,32 @@ public class DragonManager extends JFrame implements ActionListener {
          *  Add custom painting
          */
         @Override
-        protected void paintComponent(Graphics g)
-        {
+        protected void paintComponent(Graphics g) {
             super.paintComponent(g);
 
             //  Invoke the painter for the background
 
-            if (painter != null)
-            {
+            if (painter != null) {
                 Dimension d = getSize();
                 Graphics2D g2 = (Graphics2D) g;
                 g2.setPaint(painter);
-                g2.fill( new Rectangle(0, 0, d.width, d.height) );
+                g2.fill(new Rectangle(0, 0, d.width, d.height));
             }
 
             //  Draw the image
 
-            if (image == null ) return;
+            if (image == null) return;
 
-            switch (style)
-            {
-                case SCALED :
+            switch (style) {
+                case SCALED:
                     drawScaled(g);
                     break;
 
-                case TILED  :
+                case TILED:
                     drawTiled(g);
                     break;
 
-                case ACTUAL :
+                case ACTUAL:
                     drawActual(g);
                     break;
 
@@ -711,8 +853,7 @@ public class DragonManager extends JFrame implements ActionListener {
         /*
          *  Custom painting code for drawing a SCALED image as the background
          */
-        private void drawScaled(Graphics g)
-        {
+        private void drawScaled(Graphics g) {
             Dimension d = getSize();
             g.drawImage(image, 0, 0, d.width, d.height, null);
         }
@@ -720,17 +861,14 @@ public class DragonManager extends JFrame implements ActionListener {
         /*
          *  Custom painting code for drawing TILED images as the background
          */
-        private void drawTiled(Graphics g)
-        {
+        private void drawTiled(Graphics g) {
             Dimension d = getSize();
-            int width = image.getWidth( null );
-            int height = image.getHeight( null );
+            int width = image.getWidth(null);
+            int height = image.getHeight(null);
 
-            for (int x = 0; x < d.width; x += width)
-            {
-                for (int y = 0; y < d.height; y += height)
-                {
-                    g.drawImage( image, x, y, null, null );
+            for (int x = 0; x < d.width; x += width) {
+                for (int y = 0; y < d.height; y += height) {
+                    g.drawImage(image, x, y, null, null);
                 }
             }
         }
@@ -740,169 +878,14 @@ public class DragonManager extends JFrame implements ActionListener {
          *  The image is positioned in the panel based on the horizontal and
          *  vertical alignments specified.
          */
-        private void drawActual(Graphics g)
-        {
+        private void drawActual(Graphics g) {
             Dimension d = getSize();
             Insets insets = getInsets();
             int width = d.width - insets.left - insets.right;
             int height = d.height - insets.top - insets.left;
             float x = (width - image.getWidth(null)) * alignmentX;
             float y = (height - image.getHeight(null)) * alignmentY;
-            g.drawImage(image, (int)x + insets.left, (int)y + insets.top, this);
+            g.drawImage(image, (int) x + insets.left, (int) y + insets.top, this);
         }
-    }
-
-    // Tint background image, taken from https://stackoverflow.com/questions/4248104/applying-a-tint-to-an-image-in-java
-    public BufferedImage darkenImage(BufferedImage originalImage) {
-        // Make 40% darker
-        RescaleOp filter = new RescaleOp(.6f, 0, null);
-        return filter.filter(originalImage, null);
-    }
-
-    private JLabel createText(BackgroundPanel panel, String caption, GridBagConstraints constraints) {
-        JLabel t = new JLabel(caption);
-        panel.add(t, constraints);
-        return t;
-    }
-    private JButton createButton(BackgroundPanel panel, String caption, String actionCommand, GridBagConstraints constraints) {
-        JButton b = new JButton(caption);
-        b.setActionCommand(actionCommand);
-        b.addActionListener(this);
-        panel.add(b, constraints);
-        return b;
-    }
-
-    private JTextField createTextField(BackgroundPanel panel, String actionCommand, GridBagConstraints constraints) {
-        JTextField tf = new JTextField();
-        tf.setActionCommand(actionCommand);
-        tf.addActionListener(this);
-        panel.add(tf, constraints);
-        return tf;
-    }
-
-    public DragonManager() {
-        super("DragonManager");
-        // Default settings, like padding and exit behavior
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        // Create tabbedpane for everything to be added to
-        JTabbedPane tabbedPane = new JTabbedPane();
-
-        // Set Icon
-        try {
-            if (System.getProperty("os.name").toLowerCase().contains("mac")) {
-                Taskbar.getTaskbar().setIconImage(ImageIO.read(getClass().getResourceAsStream("/DragonManager.png"))); // set icon image if on macos
-            } else {
-                setIconImage(ImageIO.read(getClass().getResourceAsStream("/DragonManager.png"))); // set icon image if not on macos
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        // Create Main Menu and add it as a tab
-        BackgroundPanel mainScreen = new BackgroundPanel(null, BackgroundPanel.SCALED, 0.0f, 0.0f);
-        bgTabs.add(mainScreen);
-        mainScreen.setLayout(new GridBagLayout());
-        tabbedPane.addTab("Character", mainScreen);
-
-        // Same as above but with the Search menu
-        BackgroundPanel searchMenu = new BackgroundPanel(null, BackgroundPanel.SCALED, 0.0f, 0.0f);
-        bgTabs.add(searchMenu);
-        searchMenu.setLayout(new GridBagLayout());
-        tabbedPane.addTab("Search", searchMenu);
-
-        // Create search menu components
-
-        // Search Filter
-        String[] searchFilterList = {"All", "Spells", "Monsters", "Backgrounds", "Planes", "Feats", "Conditions", "Races", "Classes", "Magic Items", "Weapons", "Armor"};
-
-        GridBagConstraints searchFilterConstraints = new GridBagConstraints();
-        searchFilterConstraints.insets = new Insets(10, 3, 5, 10);
-        searchFilterConstraints.fill = GridBagConstraints.HORIZONTAL;
-        searchFilterConstraints.gridx = 1;
-        searchFilterConstraints.weightx = 0.4;
-        JComboBox searchFilter = new JComboBox(searchFilterList);
-
-        // Search Box
-        GridBagConstraints searchBoxConstraints = new GridBagConstraints();
-        searchBoxConstraints.insets = new Insets(10, 10, 5, 3);
-        searchBoxConstraints.fill = GridBagConstraints.HORIZONTAL;
-        searchBoxConstraints.weightx = 0.6;
-        JTextField searchBox = new JTextField();
-        searchBox.addActionListener(new SearchEvent(searchFilter));
-
-        // Search Results
-        GridBagConstraints searchResultConstraints = new GridBagConstraints();
-        searchResultConstraints.insets = new Insets(5, 10, 3, 10);
-        searchResultConstraints.gridy = 1;
-        searchResultConstraints.fill = GridBagConstraints.BOTH;
-        searchResultConstraints.weighty = 1;
-        searchResultConstraints.weightx = 0.4;
-        JList searchResultsList = new JList(searchResultsArray);
-        searchResultsList.addListSelectionListener(new IndexChangeEvent(searchResultsList));
-        JScrollPane resultsPane = new JScrollPane();
-        resultsPane.setBorder(null);
-        resultsPane.setViewportView(searchResultsList);
-
-        // Result Data
-        GridBagConstraints resultInfoConstraints = new GridBagConstraints();
-        resultInfoConstraints.insets = new Insets(5, 10, 3, 10);
-        resultInfoConstraints.gridy = 1;
-        resultInfoConstraints.gridx = 1;
-        resultInfoConstraints.weightx = 0.4;
-        resultInfoConstraints.fill = GridBagConstraints.BOTH;
-        JScrollPane resultInfoPane = new JScrollPane();
-        resultInfoPane.setBorder(null);
-
-
-        // Add in order
-        searchMenu.add(searchBox, searchBoxConstraints);
-        searchMenu.add(searchFilter, searchFilterConstraints);
-        searchMenu.add(resultsPane, searchResultConstraints);
-        searchMenu.add(resultInfoPane, resultInfoConstraints);
-
-        // Add pane to frame and set background on tabs
-        add(tabbedPane, BorderLayout.CENTER);
-        setBackground(bgTabs);
-
-        // Create and set Menu Bar
-        JMenuBar menu = createMenu();
-        setJMenuBar(menu);
-
-        // Set size
-        Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
-        int screenHeight = (int) (screenSize.height * 0.75); // get height and width of the screen and make it 3/4
-        int screenWidth = (int) (screenSize.width * 0.75);
-        mainScreen.setSize(new Dimension(screenWidth, screenHeight));
-        searchMenu.setSize(new Dimension(screenWidth, screenHeight));
-        setSize(new Dimension(screenWidth, screenHeight));
-
-        // Display Window
-        setVisible(true);
-    }
-
-
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(new Runnable() {
-            public void run() {
-                // Set theme for application if a preference is set
-                try {
-                    if (Objects.equals(prefs.get("theme", null), "dark")) { // use == because it can be null
-                        UIManager.setLookAndFeel(new FlatDarkLaf());
-                    } else {
-                        UIManager.setLookAndFeel(new FlatLightLaf());
-                    }
-                    // Make things rounder
-                    UIManager.put( "Button.arc", 10 );
-                    UIManager.put( "Component.arc", 10 );
-                    UIManager.put( "ProgressBar.arc", 10 );
-                    UIManager.put( "TextComponent.arc", 10 );
-                    //
-                } catch( Exception ex ) {
-                    System.err.println( "Failed to initialize LaF, " + ex);
-                }
-                System.setProperty("apple.laf.useScreenMenuBar", "true"); // If on macOS make menu bar show up top
-                new DragonManager();
-            }
-        });
     }
 }
