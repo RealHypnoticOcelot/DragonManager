@@ -34,6 +34,7 @@ public class DragonManager extends JFrame implements ActionListener {
     // Components that are only enabled when no character is loaded
     public static ArrayList<JComponent> noCharComponents = new ArrayList<>();
     public static DefaultListModel searchResultsArray = new DefaultListModel();
+    public static int pageNumber = 1;
 
     public DragonManager() {
         super("DragonManager");
@@ -555,7 +556,6 @@ public class DragonManager extends JFrame implements ActionListener {
     // Search action
     private class SearchEvent implements ActionListener {
         private final JComboBox searchFilter;
-        private JProgressBar progressBar;
 
         public SearchEvent(JComboBox searchFilter) {
             this.searchFilter = searchFilter;
@@ -571,8 +571,8 @@ public class DragonManager extends JFrame implements ActionListener {
 
                 searchResultsArray.clear();
                 searchBox.setEditable(false);
-                // If using generic search instead of specific search
                 try {
+                    // If using generic search instead of specific search
                     if (searchFilter.getSelectedIndex() == 0) {
                         Object[] searchResults = namesAndData(getJson(new URI("https://api.open5e.com/" + searchFilterSlug[searchFilter.getSelectedIndex()] + "?format=json&text=" + searchBox.getText())), "results", 0);
                         searchArray = (JSONObject[]) searchResults[0];
